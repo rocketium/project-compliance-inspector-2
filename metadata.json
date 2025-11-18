@@ -1,0 +1,5 @@
+{
+  "name": "AdAnalyzer AI",
+  "description": "Upload advertisement images to extract text, identify visual elements, and get precise bounding box outlines using Gemini 3 Pro Thinking mode.",
+  "requestFramePermissions": []
+}

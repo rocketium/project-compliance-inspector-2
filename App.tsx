@@ -222,6 +222,7 @@ const App: React.FC = () => {
               imageSrc={imagePreview} 
               analysis={analysisResult} 
               onReset={handleReset} 
+              platform={platform}
             />
           </div>
         )}

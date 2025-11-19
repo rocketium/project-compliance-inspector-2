@@ -6,11 +6,12 @@ interface ResultsViewProps {
   imageSrc: string;
   analysis: AnalysisResult;
   onReset: () => void;
+  platform: string;
 }
 
 type ViewMode = 'box' | 'outline';
 
-export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, onReset }) => {
+export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, onReset, platform }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [elementsWithCrops, setElementsWithCrops] = useState<AnalyzedElement[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -217,7 +218,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, on
       {/* Right Panel: Extracted Items */}
       <div className="w-full lg:w-[400px] flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-full max-h-[80vh] lg:max-h-full">
         <div className="p-4 border-b border-slate-100 bg-slate-50">
-          <h2 className="font-semibold text-slate-700 mb-3">Extracted Contents</h2>
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="font-semibold text-slate-700">Extracted Contents</h2>
+            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full border border-indigo-100 font-mono">
+              {platform}
+            </span>
+          </div>
           
           {/* Category Filter */}
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">

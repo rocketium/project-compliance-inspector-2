@@ -1,9 +1,29 @@
-import React, { useState, useCallback } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { analyzeImageWithGemini } from './services/gemini';
-import { AnalysisResult, AppState } from './types';
+import { AnalysisResult, AppState, PlatformConfig } from './types';
 import { ResultsView } from './components/ResultsView';
-import { Spinner } from './components/Spinner';
-import { UploadCloud, FileImage, AlertCircle, Sparkles } from 'lucide-react';
+import { UploadCloud, FileImage, AlertCircle, Sparkles, Settings } from 'lucide-react';
+import { AdminPanel } from './components/AdminPanel';
+
+// Fallback platforms in case fetch fails
+const DEFAULT_PLATFORMS: PlatformConfig[] = [
+  {
+    "id": "default",
+    "name": "Default",
+    "prompt": "Analyze this advertisement or design image in extreme detail. Identify all distinct elements: Text blocks, Visual elements. Classify into 'Text', 'Logo', 'Product', 'Button', 'Other'. Provide precise bounding boxes normalized to 0-1000 scale."
+  },
+  {
+    "id": "am-fuse",
+    "name": "Amazon Fuse",
+    "prompt": "You are a Co-Branding Compliance AI specialized in Amazon Fuse. Identify Partner Attribution (Classify as 'Partner'), Service Attribution ('Logo'), Offer ('Text'), Compliance ('Text'), Key Art ('Product'), CTA ('Button')."
+  },
+  {
+    "id": "am-ads",
+    "name": "Amazon Ads",
+    "prompt": "Analyze this image as an e-commerce ad. Identify Product, Brand Identity ('Logo'), Pricing ('Text'), Ratings ('Other'), CTA ('Button')."
+  }
+];
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
@@ -12,6 +32,57 @@ const App: React.FC = () => {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [thinkingTime, setThinkingTime] = useState(0);
+  const [showAdmin, setShowAdmin] = useState(false);
+  
+  // Platform Management
+  const [platforms, setPlatforms] = useState<PlatformConfig[]>(DEFAULT_PLATFORMS);
+  const [activePlatformId, setActivePlatformId] = useState<string>('default');
+
+  const fetchPlatforms = async () => {
+    try {
+      const res = await fetch('/api/platforms');
+      if (res.ok) {
+        const data = await res.json();
+        setPlatforms(data);
+      } else {
+        // Handle 404 or other errors without crashing
+         console.warn("Could not fetch platforms from API, checking fallback...");
+         try {
+             // Fallback to json file if api is 404 (static hosting)
+             const staticRes = await fetch('/platforms.json');
+             if(staticRes.ok) {
+                 const staticData = await staticRes.json();
+                 setPlatforms(staticData);
+             }
+         } catch(e) {
+             console.warn("Using default fallback configuration");
+         }
+      }
+    } catch (err) {
+      console.warn("Using default fallback configuration due to network error");
+      // Keep DEFAULT_PLATFORMS
+    }
+  };
+
+  useEffect(() => {
+    // 1. Load Platforms
+    fetchPlatforms();
+
+    // 2. Check URL for platform param
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get('platform');
+    if (p) {
+      setActivePlatformId(p);
+    }
+    
+    // 3. Check routing
+    if (window.location.pathname === '/admin') {
+      setShowAdmin(true);
+    }
+  }, []);
+
+  // Use derived active platform, strictly falling back if ID not found
+  const activePlatform = platforms.find(p => p.id === activePlatformId) || platforms[0] || DEFAULT_PLATFORMS[0];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -53,12 +124,18 @@ const App: React.FC = () => {
       const base64Data = imagePreview.split(',')[1];
       const mimeType = imageFile.type;
 
-      const result = await analyzeImageWithGemini(base64Data, mimeType);
+      // Use the specific prompt for the active platform
+      const result = await analyzeImageWithGemini(base64Data, mimeType, activePlatform.prompt);
       setAnalysisResult(result);
       setAppState(AppState.SUCCESS);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "An error occurred during analysis. Please try again.");
+      // Handle JSON parse errors from HTML responses
+      let message = err.message || "An error occurred during analysis.";
+      if (message.includes('Unexpected token') || message.includes('is not valid JSON')) {
+        message = "API Error: The server returned an invalid response. Please check your connection or API key.";
+      }
+      setErrorMsg(message);
       setAppState(AppState.ERROR);
     } finally {
       clearInterval(timer);
@@ -74,6 +151,24 @@ const App: React.FC = () => {
     setErrorMsg(null);
   };
 
+  // Render Admin Panel
+  if (showAdmin) {
+      return (
+          <div className="min-h-screen bg-slate-100 p-8">
+              <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden min-h-[600px]">
+                <AdminPanel 
+                  onClose={() => {
+                      setShowAdmin(false);
+                      window.history.pushState({}, '', '/');
+                      fetchPlatforms(); // Refresh data
+                  }}
+                  currentPlatforms={platforms}
+                />
+              </div>
+          </div>
+      )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Header */}
@@ -85,7 +180,20 @@ const App: React.FC = () => {
             </div>
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">AdAnalyzer AI</h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+             {activePlatformId !== 'default' && (
+               <span className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs font-medium">
+                 Platform: {activePlatform.name} 
+                 <a href="/admin" onClick={(e) => { e.preventDefault(); setShowAdmin(true); }} className="ml-1 underline hover:text-indigo-900">Configure</a>
+               </span>
+             )}
+             <button 
+               onClick={() => setShowAdmin(true)}
+               className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full"
+               title="Settings"
+             >
+               <Settings size={20} />
+             </button>
           </div>
         </div>
       </header>
@@ -98,7 +206,8 @@ const App: React.FC = () => {
             <div className="text-center mb-10">
               <h2 className="text-3xl font-bold text-slate-800 mb-4">Extract logic from visual chaos</h2>
               <p className="text-lg text-slate-600 leading-relaxed">
-                Upload an advertisement, flyer, or UI design. The AI will analyze the layout, extract text, and isolate individual visual components for you.
+                Upload an advertisement, flyer, or UI design. The AI will analyze the layout
+                using the <strong className="text-indigo-600">{activePlatform.name}</strong> configuration.
               </p>
             </div>
 
@@ -121,6 +230,25 @@ const App: React.FC = () => {
                   Select Image
                 </span>
               </label>
+            </div>
+            
+            <div className="mt-8 flex justify-center gap-2 text-xs text-slate-400">
+                {platforms.map(p => (
+                    <React.Fragment key={p.id}>
+                        <span 
+                            onClick={() => {
+                                setActivePlatformId(p.id);
+                                const newUrl = new URL(window.location.href);
+                                newUrl.searchParams.set('platform', p.id);
+                                window.history.pushState({}, '', newUrl);
+                            }}
+                            className={`cursor-pointer hover:text-indigo-500 ${activePlatformId === p.id ? 'font-bold text-slate-600' : ''}`}
+                        >
+                            {p.name}
+                        </span>
+                        <span className="last:hidden">•</span>
+                    </React.Fragment>
+                ))}
             </div>
           </div>
         )}
@@ -166,8 +294,11 @@ const App: React.FC = () => {
             </div>
             <h3 className="text-2xl font-bold text-slate-800 mb-3">Analyzing visual structure...</h3>
             <p className="text-slate-500 mb-8">
-              The AI is thinking deeply about the layout. It identifies text hierarchies, object boundaries, and visual relationships. This might take a moment.
+              Thinking mode enabled. Using <strong>{activePlatform.name}</strong> logic to deconstruct the image.
             </p>
+             <div className="mb-6 inline-block bg-slate-100 px-4 py-2 rounded font-mono text-xs text-slate-500">
+               Platform: {activePlatformId}
+             </div>
             
             <div className="space-y-3 max-w-xs mx-auto text-left">
               <div className="flex items-center gap-3 text-sm text-slate-600 animate-pulse">
@@ -209,7 +340,9 @@ const App: React.FC = () => {
             <ResultsView 
               imageSrc={imagePreview} 
               analysis={analysisResult} 
-              onReset={handleReset} 
+              onReset={handleReset}
+              platformName={activePlatform.name}
+              complianceRules={activePlatform.complianceRules}
             />
           </div>
         )}

@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
-import { AnalysisResult } from "../types";
+import { AnalysisResult, ComplianceResult } from "../types";
 
 // Initialize the Gemini API client
 // API key must be provided via process.env.API_KEY
@@ -11,12 +12,13 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
  */
 export const analyzeImageWithGemini = async (
   base64Image: string,
-  mimeType: string
+  mimeType: string,
+  customPrompt?: string
 ): Promise<AnalysisResult> => {
   try {
     const model = "gemini-3-pro-preview";
     
-    const prompt = `
+    const defaultPrompt = `
       Analyze this advertisement or design image in extreme detail.
       
       Your task is to decompose the image into its constituent parts for a design system.
@@ -32,6 +34,8 @@ export const analyzeImageWithGemini = async (
       Be very precise with the bounding boxes. Do not overlap boxes if possible unless elements are nested.
       Ensure every visible piece of significant content is captured.
     `;
+
+    const prompt = customPrompt || defaultPrompt;
 
     const response = await ai.models.generateContent({
       model: model,
@@ -68,13 +72,25 @@ export const analyzeImageWithGemini = async (
                   },
                   category: {
                     type: Type.STRING,
-                    enum: ["Text", "Logo", "Product", "Button", "Other"],
-                    description: "The type of element.",
+                    enum: ["Text", "Logo", "Product", "Button", "Other", "Partner"],
+                    description: "The type of element. Use 'Partner' for partner logos in co-branding.",
                   },
                   ymin: { type: Type.NUMBER, description: "Top coordinate (0-1000)" },
                   xmin: { type: Type.NUMBER, description: "Left coordinate (0-1000)" },
                   ymax: { type: Type.NUMBER, description: "Bottom coordinate (0-1000)" },
                   xmax: { type: Type.NUMBER, description: "Right coordinate (0-1000)" },
+                  polygon: {
+                    type: Type.ARRAY,
+                    description: "A series of points (x,y) defining the detailed polygon outline of the object.",
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        x: { type: Type.NUMBER },
+                        y: { type: Type.NUMBER }
+                      },
+                      required: ["x", "y"]
+                    }
+                  }
                 },
                 required: ["content", "category", "ymin", "xmin", "ymax", "xmax"],
               },
@@ -103,6 +119,7 @@ export const analyzeImageWithGemini = async (
         ymax: el.ymax / 1000,
         xmax: el.xmax / 1000,
       },
+      polygon: el.polygon ? el.polygon.map((p: any) => ({ x: p.x / 1000, y: p.y / 1000 })) : undefined
     }));
 
     return { elements };
@@ -112,3 +129,91 @@ export const analyzeImageWithGemini = async (
     throw error;
   }
 };
+
+/**
+ * Checks an image against a specific set of compliance rules.
+ */
+export const checkComplianceWithGemini = async (
+  base64Image: string,
+  mimeType: string,
+  rules: string[]
+): Promise<ComplianceResult[]> => {
+  try {
+    const model = "gemini-3-pro-preview";
+
+    const prompt = `
+      You are a Strict Brand Compliance Officer. 
+      Evaluate the provided advertisement image against the following list of rules.
+      
+      For each rule, determine if the image passes or fails. 
+      Be extremely strict. Visual consistency is key.
+      
+      Rules to Check:
+      ${rules.map((rule, i) => `${i + 1}. ${rule}`).join('\n')}
+    `;
+
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Image,
+            },
+          },
+          {
+            text: prompt,
+          },
+        ],
+      },
+      config: {
+        thinkingConfig: {
+          thinkingBudget: 16000, // Lower budget than analysis but still needs reasoning
+        },
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            results: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  ruleIndex: { type: Type.INTEGER, description: "The index of the rule (1-based)" },
+                  status: { 
+                    type: Type.STRING, 
+                    enum: ["PASS", "FAIL", "WARNING"],
+                    description: "Use FAIL if there is a clear violation. Use WARNING if unsure or minor." 
+                  },
+                  reasoning: { type: Type.STRING, description: "Brief explanation of why it passed or failed." }
+                },
+                required: ["ruleIndex", "status", "reasoning"]
+              }
+            }
+          },
+          required: ["results"]
+        }
+      }
+    });
+
+    const resultText = response.text;
+    if (!resultText) throw new Error("No response from Compliance Check");
+
+    const parsedData = JSON.parse(resultText);
+
+    // Map back to the original rules array
+    return rules.map((rule, index) => {
+      const found = parsedData.results.find((r: any) => r.ruleIndex === index + 1);
+      return {
+        rule: rule,
+        status: found?.status || 'WARNING',
+        reasoning: found?.reasoning || 'Could not verify this rule.'
+      };
+    });
+
+  } catch (error) {
+    console.error("Error checking compliance:", error);
+    throw error;
+  }
+}

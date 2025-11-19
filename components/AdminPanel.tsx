@@ -5,11 +5,10 @@ import { X, Plus, Save, Trash2, Edit2, Check, UploadCloud, Image as ImageIcon } 
 interface AdminPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  currentPlatforms: PlatformConfig[];
-  onPlatformsUpdate: () => void;
+  onPlatformsUpdate: () => void; // Callback to refresh main app state
 }
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, currentPlatforms, onPlatformsUpdate }) => {
+export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, onPlatformsUpdate }) => {
   const [platforms, setPlatforms] = useState<PlatformConfig[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<PlatformConfig>>({});
@@ -17,24 +16,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, current
 
   useEffect(() => {
     if (isOpen) {
-      // Initialize with parent data immediately so it's not empty
-      setPlatforms(currentPlatforms);
-      // Then try to fetch fresh data
       fetchPlatforms();
     }
-  }, [isOpen, currentPlatforms]);
+  }, [isOpen]);
 
   const fetchPlatforms = async () => {
     try {
-      // Don't show loading spinner if we already have data from props
-      if (currentPlatforms.length === 0) setLoading(true);
-      
+      setLoading(true);
       const res = await fetch('http://localhost:3000/api/platforms');
       const data = await res.json();
       setPlatforms(data);
     } catch (err) {
-      console.error("Failed to fetch platforms in admin panel", err);
-      // If fetch fails but we have props, we silently keep using props data
+      console.error("Failed to fetch platforms", err);
     } finally {
       setLoading(false);
     }
@@ -78,9 +71,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, current
       });
 
       if (res.ok) {
-        await fetchPlatforms(); // Refresh local list
-        onPlatformsUpdate(); // Refresh parent app
+        await fetchPlatforms();
         handleCancel();
+        onPlatformsUpdate();
       } else {
         alert('Failed to save platform');
       }
@@ -112,6 +105,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, current
       const reader = new FileReader();
       reader.onload = (ev) => {
         const base64 = ev.target?.result as string;
+        // Strip the data:image/xxx;base64, part for storage if desired, 
+        // or store full string. The server currently accepts base64 strings.
+        // The current app logic splits it in some places, but let's store clean base64.
         const cleanBase64 = base64.split(',')[1];
         setFormData(prev => ({ ...prev, referenceLogo: cleanBase64 }));
       };
@@ -138,7 +134,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, current
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 relative">
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
           {loading && (
             <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
               <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
@@ -252,13 +248,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, current
           ) : (
             /* List View */
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {platforms.length === 0 && !loading && (
-                 <div className="col-span-1 md:col-span-2 text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed">
-                    <p className="text-slate-400 mb-2">No platforms found.</p>
-                    <button onClick={fetchPlatforms} className="text-indigo-600 text-sm font-medium hover:underline">Retry Connection</button>
-                 </div>
-              )}
-
               {platforms.map(p => (
                 <div key={p.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:border-indigo-300 transition-colors group">
                   <div className="flex justify-between items-start mb-3">

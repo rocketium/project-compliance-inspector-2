@@ -24,29 +24,13 @@ const jobs = new Map();
 // Initialize Gemini
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// Minimal Default Fallback (in case file is missing)
+// Minimal Default Fallback (only used if platforms.json is deleted/missing)
 const DEFAULT_PLATFORMS = [
   {
     id: 'default',
     name: 'Default',
     description: 'Standard detailed analysis',
-    prompt: `
-      Analyze this advertisement or design image in extreme detail.
-      
-      Your task is to decompose the image into its constituent parts for a design system.
-      Identify all distinct elements:
-      1. Text blocks (headlines, body copy, disclaimers, prices).
-      2. Visual elements (product shots, logos, icons, buttons, graphical shapes).
-      
-      For each element identified:
-      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
-      - Provide the exact text content (if it is text) or a concise visual description (if it is an image).
-      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
-      - Provide a detailed polygon outline (list of x,y coordinates) that tightly encloses the element, also normalized to 0-1000 scale.
-      
-      Be very precise with the boundaries. Do not overlap boxes if possible unless elements are nested.
-      Ensure every visible piece of significant content is captured.
-    `
+    prompt: 'Analyze this image and identify text, logos, products, buttons with bounding boxes and polygons.'
   }
 ];
 

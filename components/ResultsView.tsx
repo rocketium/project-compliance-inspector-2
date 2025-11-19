@@ -1,22 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnalysisResult, AnalyzedElement } from '../types';
-import { Download, Type, Image as ImageIcon, Box, MousePointerClick, Eye, Maximize, Spline } from 'lucide-react';
+import { Download, Type, Image as ImageIcon, Box, MousePointerClick, Eye } from 'lucide-react';
 
 interface ResultsViewProps {
   imageSrc: string;
   analysis: AnalysisResult;
   onReset: () => void;
-  platform: string;
 }
 
-type ViewMode = 'box' | 'outline';
-
-export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, onReset, platform }) => {
+export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, onReset }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [elementsWithCrops, setElementsWithCrops] = useState<AnalyzedElement[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [viewMode, setViewMode] = useState<ViewMode>('box');
 
   // Generate crops when image loads
   useEffect(() => {
@@ -94,35 +91,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, on
       {/* Left Panel: Image Overlay */}
       <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[400px]">
         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-          <div className="flex items-center gap-4">
-            <h2 className="font-semibold text-slate-700 flex items-center gap-2">
-              <ImageIcon size={18} /> Analysis
-            </h2>
-            <div className="flex bg-slate-200 rounded-lg p-0.5">
-              <button 
-                onClick={() => setViewMode('box')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
-                  viewMode === 'box' 
-                    ? 'bg-white shadow text-slate-800' 
-                    : 'text-slate-600 hover:text-slate-800 hover:bg-slate-200/50'
-                }`}
-              >
-                <Maximize size={14} />
-                Box
-              </button>
-              <button 
-                onClick={() => setViewMode('outline')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
-                  viewMode === 'outline' 
-                    ? 'bg-white shadow text-slate-800' 
-                    : 'text-slate-600 hover:text-slate-800 hover:bg-slate-200/50'
-                }`}
-              >
-                <Spline size={14} />
-                Outline
-              </button>
-            </div>
-          </div>
+          <h2 className="font-semibold text-slate-700 flex items-center gap-2">
+            <ImageIcon size={18} /> Original with Outlines
+          </h2>
            <button onClick={onReset} className="text-sm text-red-600 hover:text-red-700 font-medium">
             Analyze Another
           </button>
@@ -133,84 +104,37 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, on
             <img 
               src={imageSrc} 
               alt="Analyzed" 
-              className="max-w-full max-h-[70vh] block object-contain select-none" 
+              className="max-w-full max-h-[70vh] block object-contain" 
             />
-            
             {/* Bounding Box Overlay */}
-            {viewMode === 'box' && (
-              <div className="absolute inset-0 pointer-events-none">
-                {elementsWithCrops.map((el) => (
-                  <div
-                    key={el.id}
-                    className={`absolute border-2 transition-all duration-200 ${
-                      hoveredId === el.id ? 'bg-opacity-20 z-10 shadow-sm' : 'bg-opacity-0 z-0'
-                    }`}
-                    style={{
-                      top: `${el.box.ymin * 100}%`,
-                      left: `${el.box.xmin * 100}%`,
-                      width: `${(el.box.xmax - el.box.xmin) * 100}%`,
-                      height: `${(el.box.ymax - el.box.ymin) * 100}%`,
-                      borderColor: getStrokeColor(el.category),
-                      backgroundColor: hoveredId === el.id ? getStrokeColor(el.category) + '33' : 'transparent',
-                    }}
-                  >
-                    {hoveredId === el.id && (
-                       <div 
-                        className="absolute -top-6 left-0 px-2 py-0.5 text-xs text-white font-bold rounded shadow-sm whitespace-nowrap"
-                        style={{ backgroundColor: getStrokeColor(el.category) }}
-                       >
-                         {el.category}
-                       </div>
-                     )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Polygon Outline Overlay */}
-            {viewMode === 'outline' && (
-              <svg 
-                className="absolute inset-0 pointer-events-none w-full h-full" 
-                viewBox="0 0 1 1" 
-                preserveAspectRatio="none"
-              >
-                {elementsWithCrops.map((el) => {
-                  if (!el.polygon || el.polygon.length === 0) return null;
-                  
-                  const points = el.polygon.map(p => `${p.x},${p.y}`).join(' ');
-                  const isActive = hoveredId === el.id;
-                  const color = getStrokeColor(el.category);
-
-                  return (
-                    <g key={el.id}>
-                      <polygon
-                        points={points}
-                        fill={isActive ? color + '33' : 'transparent'} // 33 is roughly 20% hex opacity
-                        stroke={color}
-                        strokeWidth={isActive ? "0.003" : "0.002"}
-                        vectorEffect="non-scaling-stroke"
-                        className="transition-all duration-200"
-                      />
-                      {isActive && (
-                        <foreignObject 
-                          x={el.polygon[0].x} 
-                          y={el.polygon[0].y - 0.05} 
-                          width="1" 
-                          height="0.1"
-                        >
-                           <div 
-                            className="px-2 py-0.5 text-xs text-white font-bold rounded shadow-sm inline-block whitespace-nowrap"
-                            style={{ backgroundColor: color }}
-                           >
-                             {el.category}
-                           </div>
-                        </foreignObject>
-                      )}
-                    </g>
-                  );
-                })}
-              </svg>
-            )}
+            <div className="absolute inset-0 pointer-events-none">
+              {elementsWithCrops.map((el) => (
+                <div
+                  key={el.id}
+                  className={`absolute border-2 transition-all duration-200 ${
+                    hoveredId === el.id ? 'bg-opacity-20 z-10 shadow-sm' : 'bg-opacity-0 z-0'
+                  }`}
+                  style={{
+                    top: `${el.box.ymin * 100}%`,
+                    left: `${el.box.xmin * 100}%`,
+                    width: `${(el.box.xmax - el.box.xmin) * 100}%`,
+                    height: `${(el.box.ymax - el.box.ymin) * 100}%`,
+                    borderColor: getStrokeColor(el.category),
+                    backgroundColor: hoveredId === el.id ? getStrokeColor(el.category) + '33' : 'transparent',
+                  }}
+                >
+                   {/* Label tag on hover */}
+                   {hoveredId === el.id && (
+                     <div 
+                      className="absolute -top-6 left-0 px-2 py-0.5 text-xs text-white font-bold rounded shadow-sm whitespace-nowrap"
+                      style={{ backgroundColor: getStrokeColor(el.category) }}
+                     >
+                       {el.category}
+                     </div>
+                   )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -218,12 +142,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, on
       {/* Right Panel: Extracted Items */}
       <div className="w-full lg:w-[400px] flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-full max-h-[80vh] lg:max-h-full">
         <div className="p-4 border-b border-slate-100 bg-slate-50">
-          <div className="flex items-center gap-2 mb-3">
-            <h2 className="font-semibold text-slate-700">Extracted Contents</h2>
-            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full border border-indigo-100 font-mono">
-              {platform}
-            </span>
-          </div>
+          <h2 className="font-semibold text-slate-700 mb-3">Extracted Contents</h2>
           
           {/* Category Filter */}
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">

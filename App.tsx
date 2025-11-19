@@ -3,7 +3,7 @@ import { analyzeImageWithGemini, PROMPTS } from './services/gemini';
 import { AnalysisResult, AppState } from './types';
 import { ResultsView } from './components/ResultsView';
 import { Spinner } from './components/Spinner';
-import { UploadCloud, FileImage, AlertCircle, Sparkles } from 'lucide-react';
+import { UploadCloud, FileImage, AlertCircle, Sparkles, Layers } from 'lucide-react';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
@@ -101,6 +101,10 @@ const App: React.FC = () => {
         {appState === AppState.IDLE && !imagePreview && (
           <div className="max-w-2xl mx-auto mt-12">
             <div className="text-center mb-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-slate-200 shadow-sm text-slate-600 text-xs font-medium mb-6">
+                <Layers size={12} className="text-indigo-500" />
+                Platform: <span className="font-mono text-indigo-600 font-bold">{platform}</span>
+              </div>
               <h2 className="text-3xl font-bold text-slate-800 mb-4">Extract logic from visual chaos</h2>
               <p className="text-lg text-slate-600 leading-relaxed">
                 Upload an advertisement, flyer, or UI design. The AI will analyze the layout, extract text, and isolate individual visual components for you.

@@ -5,18 +5,8 @@ import { AnalysisResult } from "../types";
 // API key must be provided via process.env.API_KEY
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-/**
- * Analyzes an image to extract text and visual elements with bounding boxes.
- * Uses 'gemini-3-pro-preview' with high thinking budget for precision.
- */
-export const analyzeImageWithGemini = async (
-  base64Image: string,
-  mimeType: string
-): Promise<AnalysisResult> => {
-  try {
-    const model = "gemini-3-pro-preview";
-    
-    const prompt = `
+export const PROMPTS: Record<string, string> = {
+  'default': `
       Analyze this advertisement or design image in extreme detail.
       
       Your task is to decompose the image into its constituent parts for a design system.
@@ -32,7 +22,52 @@ export const analyzeImageWithGemini = async (
       
       Be very precise with the boundaries. Do not overlap boxes if possible unless elements are nested.
       Ensure every visible piece of significant content is captured.
-    `;
+    `,
+  'am-fuse': `
+      Analyze this image specifically for the AM Fuse platform.
+      
+      Focus on identifying elements that can be fused or recombined in a modular design system.
+      Pay special attention to:
+      1. Isolated visual assets suitable for reuse (backgrounds, extracted products).
+      2. Structural layout containers.
+      3. Typography and branding elements.
+      
+      For each element identified:
+      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
+      - Provide the exact text content or visual description.
+      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
+      - Provide a detailed polygon outline (list of x,y coordinates) normalized to 0-1000 scale for precise extraction.
+    `,
+  'am-ads': `
+      Analyze this image specifically for the AM Ads platform.
+      
+      Focus on ad-specific components, compliance, and performance drivers.
+      Identify:
+      1. Ad copy and messaging hierarchies (Headline, CTA, Disclaimer).
+      2. Call-to-action buttons and interactive areas.
+      3. Product placement and brand visibility.
+      
+      For each element identified:
+      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
+      - Provide the exact text content or visual description.
+      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
+      - Provide a detailed polygon outline (list of x,y coordinates) normalized to 0-1000 scale.
+    `
+};
+
+/**
+ * Analyzes an image to extract text and visual elements with bounding boxes.
+ * Uses 'gemini-3-pro-preview' with high thinking budget for precision.
+ */
+export const analyzeImageWithGemini = async (
+  base64Image: string,
+  mimeType: string,
+  platform: string = 'default'
+): Promise<AnalysisResult> => {
+  try {
+    const model = "gemini-3-pro-preview";
+    
+    const prompt = PROMPTS[platform] || PROMPTS['default'];
 
     const response = await ai.models.generateContent({
       model: model,

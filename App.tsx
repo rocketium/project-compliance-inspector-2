@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { analyzeImageWithGemini } from './services/gemini';
+import { analyzeImageWithGemini, PROMPTS } from './services/gemini';
 import { AnalysisResult, AppState } from './types';
 import { ResultsView } from './components/ResultsView';
 import { Spinner } from './components/Spinner';
@@ -12,6 +12,11 @@ const App: React.FC = () => {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [thinkingTime, setThinkingTime] = useState(0);
+
+  // Get platform from URL query params
+  const searchParams = new URLSearchParams(window.location.search);
+  const platformParam = searchParams.get('platform');
+  const platform = platformParam && Object.keys(PROMPTS).includes(platformParam) ? platformParam : 'default';
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -53,7 +58,7 @@ const App: React.FC = () => {
       const base64Data = imagePreview.split(',')[1];
       const mimeType = imageFile.type;
 
-      const result = await analyzeImageWithGemini(base64Data, mimeType);
+      const result = await analyzeImageWithGemini(base64Data, mimeType, platform);
       setAnalysisResult(result);
       setAppState(AppState.SUCCESS);
     } catch (err: any) {
@@ -169,7 +174,7 @@ const App: React.FC = () => {
               The AI is thinking deeply about the layout. It identifies text hierarchies, object boundaries, and visual relationships. This might take a moment.
             </p>
             
-            <div className="space-y-3 max-w-xs mx-auto text-left">
+            <div className="space-y-3 max-w-xs mx-auto text-left mb-8">
               <div className="flex items-center gap-3 text-sm text-slate-600 animate-pulse">
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                 Detecting text regions
@@ -181,6 +186,13 @@ const App: React.FC = () => {
               <div className="flex items-center gap-3 text-sm text-slate-600 animate-pulse delay-300">
                 <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
                 Categorizing visual elements
+              </div>
+            </div>
+
+            <div className="mt-8 inline-block">
+              <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-100 rounded-full text-indigo-900 text-sm font-medium">
+                <Sparkles size={14} className="text-indigo-600" />
+                <span>Platform: <span className="font-mono font-bold">{platform}</span></span>
               </div>
             </div>
           </div>

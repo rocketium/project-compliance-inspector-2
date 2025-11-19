@@ -5,11 +5,17 @@ export interface BoundingBox {
   xmax: number;
 }
 
+export interface Point {
+  x: number;
+  y: number;
+}
+
 export interface AnalyzedElement {
   id: string;
   content: string; // Text content or description of the visual
   category: 'Text' | 'Logo' | 'Product' | 'Button' | 'Other';
   box: BoundingBox;
+  polygon: Point[]; // Array of points normalized to 0-1
   croppedImageUrl?: string; // Generated client-side after analysis
 }
 

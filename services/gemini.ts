@@ -27,9 +27,10 @@ export const analyzeImageWithGemini = async (
       For each element identified:
       - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
       - Provide the exact text content (if it is text) or a concise visual description (if it is an image).
-      - precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale (where 0 is top/left and 1000 is bottom/right).
+      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
+      - Provide a detailed polygon outline (list of x,y coordinates) that tightly encloses the element, also normalized to 0-1000 scale.
       
-      Be very precise with the bounding boxes. Do not overlap boxes if possible unless elements are nested.
+      Be very precise with the boundaries. Do not overlap boxes if possible unless elements are nested.
       Ensure every visible piece of significant content is captured.
     `;
 
@@ -75,6 +76,18 @@ export const analyzeImageWithGemini = async (
                   xmin: { type: Type.NUMBER, description: "Left coordinate (0-1000)" },
                   ymax: { type: Type.NUMBER, description: "Bottom coordinate (0-1000)" },
                   xmax: { type: Type.NUMBER, description: "Right coordinate (0-1000)" },
+                  polygon: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        x: { type: Type.NUMBER, description: "X coordinate (0-1000)" },
+                        y: { type: Type.NUMBER, description: "Y coordinate (0-1000)" },
+                      },
+                      required: ["x", "y"],
+                    },
+                    description: "Ordered list of points forming the outline polygon.",
+                  },
                 },
                 required: ["content", "category", "ymin", "xmin", "ymax", "xmax"],
               },
@@ -103,6 +116,7 @@ export const analyzeImageWithGemini = async (
         ymax: el.ymax / 1000,
         xmax: el.xmax / 1000,
       },
+      polygon: el.polygon ? el.polygon.map((p: any) => ({ x: p.x / 1000, y: p.y / 1000 })) : [],
     }));
 
     return { elements };

@@ -152,6 +152,7 @@ const App: React.FC = () => {
       <AdminPanel 
         isOpen={showAdmin} 
         onClose={() => setShowAdmin(false)} 
+        currentPlatforms={platforms}
         onPlatformsUpdate={fetchPlatforms}
       />
 

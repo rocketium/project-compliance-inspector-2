@@ -5,84 +5,57 @@ import { AnalysisResult } from "../types";
 // API key must be provided via process.env.API_KEY
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-export const PROMPTS: Record<string, string> = {
-  'default': `
-      Analyze this advertisement or design image in extreme detail.
-      
-      Your task is to decompose the image into its constituent parts for a design system.
-      Identify all distinct elements:
-      1. Text blocks (headlines, body copy, disclaimers, prices).
-      2. Visual elements (product shots, logos, icons, buttons, graphical shapes).
-      
-      For each element identified:
-      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
-      - Provide the exact text content (if it is text) or a concise visual description (if it is an image).
-      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
-      - Provide a detailed polygon outline (list of x,y coordinates) that tightly encloses the element, also normalized to 0-1000 scale.
-      
-      Be very precise with the boundaries. Do not overlap boxes if possible unless elements are nested.
-      Ensure every visible piece of significant content is captured.
-    `,
-  'am-fuse': `
-      Analyze this image specifically for the AM Fuse platform.
-      
-      Focus on identifying elements that can be fused or recombined in a modular design system.
-      Pay special attention to:
-      1. Isolated visual assets suitable for reuse (backgrounds, extracted products).
-      2. Structural layout containers.
-      3. Typography and branding elements.
-      
-      For each element identified:
-      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
-      - Provide the exact text content or visual description.
-      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
-      - Provide a detailed polygon outline (list of x,y coordinates) normalized to 0-1000 scale for precise extraction.
-    `,
-  'am-ads': `
-      Analyze this image specifically for the AM Ads platform.
-      
-      Focus on ad-specific components, compliance, and performance drivers.
-      Identify:
-      1. Ad copy and messaging hierarchies (Headline, CTA, Disclaimer).
-      2. Call-to-action buttons and interactive areas.
-      3. Product placement and brand visibility.
-      
-      For each element identified:
-      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
-      - Provide the exact text content or visual description.
-      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
-      - Provide a detailed polygon outline (list of x,y coordinates) normalized to 0-1000 scale.
-    `
-};
-
 /**
  * Analyzes an image to extract text and visual elements with bounding boxes.
  * Uses 'gemini-3-pro-preview' with high thinking budget for precision.
+ * Supports optional reference image to guide detection.
  */
 export const analyzeImageWithGemini = async (
   base64Image: string,
   mimeType: string,
-  platform: string = 'default'
+  promptText: string, // Raw prompt text provided by the caller
+  referenceImageBase64?: string
 ): Promise<AnalysisResult> => {
   try {
     const model = "gemini-3-pro-preview";
     
-    const prompt = PROMPTS[platform] || PROMPTS['default'];
+    let prompt = promptText;
+
+    // Construct the content parts
+    const parts: any[] = [
+      {
+        inlineData: {
+          mimeType: mimeType,
+          data: base64Image,
+        },
+      }
+    ];
+
+    // If a reference image is provided, add it to the payload and update the prompt instructions
+    if (referenceImageBase64) {
+      parts.push({
+        inlineData: {
+          mimeType: "image/png", // Assuming PNG/JPEG from canvas/file reader usually
+          data: referenceImageBase64,
+        },
+      });
+      
+      prompt += `
+      
+      IMPORTANT: A second image has been provided as a REFERENCE. 
+      This reference image contains a specific logo or visual element that is critical.
+      You must identify this specific element within the main image (the first image).
+      - Ensure the bounding box and polygon outline for this referenced element are pixel-perfect.
+      - Verify that the extracted element matches the visual characteristics of the reference.
+      `;
+    }
+
+    parts.push({ text: prompt });
 
     const response = await ai.models.generateContent({
       model: model,
       contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: base64Image,
-            },
-          },
-          {
-            text: prompt,
-          },
-        ],
+        parts: parts,
       },
       config: {
         // Enable Thinking Mode with max budget for complex layout analysis

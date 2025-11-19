@@ -23,6 +23,14 @@ export interface AnalysisResult {
   elements: AnalyzedElement[];
 }
 
+export interface PlatformConfig {
+  id: string;
+  name: string;
+  description: string;
+  prompt: string;
+  referenceLogo?: string; // Base64 string of the reference logo
+}
+
 export enum AppState {
   IDLE = 'IDLE',
   ANALYZING = 'ANALYZING',

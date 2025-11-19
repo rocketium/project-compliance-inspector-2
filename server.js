@@ -6,13 +6,14 @@ import { GoogleGenAI, Type } from '@google/genai';
 const app = express();
 const port = 3000;
 
+// Increase payload limit for base64 images in JSON body (reference logos)
+app.use(express.json({ limit: '50mb' }));
+app.use(cors());
+
 // Configure multer for memory storage to handle file uploads
 const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
-
-app.use(cors());
-app.use(express.json());
 
 // Store jobs in memory
 const jobs = new Map();
@@ -20,9 +21,13 @@ const jobs = new Map();
 // Initialize Gemini
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// Define prompts for different platforms
-const PROMPTS = {
-  'default': `
+// Initial Platform Data (Migrated from static PROMPTS)
+let platforms = [
+  {
+    id: 'default',
+    name: 'Default',
+    description: 'Standard detailed analysis',
+    prompt: `
       Analyze this advertisement or design image in extreme detail.
       
       Your task is to decompose the image into its constituent parts for a design system.
@@ -38,8 +43,13 @@ const PROMPTS = {
       
       Be very precise with the boundaries. Do not overlap boxes if possible unless elements are nested.
       Ensure every visible piece of significant content is captured.
-    `,
-  'am-fuse': `
+    `
+  },
+  {
+    id: 'am-fuse',
+    name: 'AM Fuse',
+    description: 'Modular design system extraction',
+    prompt: `
       Analyze this image specifically for the AM Fuse platform.
       
       Focus on identifying elements that can be fused or recombined in a modular design system.
@@ -53,8 +63,13 @@ const PROMPTS = {
       - Provide the exact text content or visual description.
       - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
       - Provide a detailed polygon outline (list of x,y coordinates) normalized to 0-1000 scale for precise extraction.
-    `,
-  'am-ads': `
+    `
+  },
+  {
+    id: 'am-ads',
+    name: 'AM Ads',
+    description: 'Ad performance and compliance analysis',
+    prompt: `
       Analyze this image specifically for the AM Ads platform.
       
       Focus on ad-specific components, compliance, and performance drivers.
@@ -69,14 +84,62 @@ const PROMPTS = {
       - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
       - Provide a detailed polygon outline (list of x,y coordinates) normalized to 0-1000 scale.
     `
-};
+  }
+];
+
+// --- Platform Management API ---
+
+app.get('/api/platforms', (req, res) => {
+  res.json(platforms);
+});
+
+app.post('/api/platforms', (req, res) => {
+  const { id, name, description, prompt, referenceLogo } = req.body;
+  if (!id || !name || !prompt) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  
+  if (platforms.some(p => p.id === id)) {
+    return res.status(400).json({ error: 'Platform ID already exists' });
+  }
+
+  const newPlatform = { id, name, description, prompt, referenceLogo };
+  platforms.push(newPlatform);
+  res.json(newPlatform);
+});
+
+app.put('/api/platforms/:id', (req, res) => {
+  const { id } = req.params;
+  const index = platforms.findIndex(p => p.id === id);
+  
+  if (index === -1) {
+    return res.status(404).json({ error: 'Platform not found' });
+  }
+
+  platforms[index] = { ...platforms[index], ...req.body };
+  res.json(platforms[index]);
+});
+
+app.delete('/api/platforms/:id', (req, res) => {
+  const { id } = req.params;
+  const initialLength = platforms.length;
+  platforms = platforms.filter(p => p.id !== id);
+  
+  if (platforms.length === initialLength) {
+    return res.status(404).json({ error: 'Platform not found' });
+  }
+  
+  res.json({ success: true });
+});
+
+// --- Analysis API ---
 
 /**
  * POST /api/analyze
  * Uploads an image and starts the analysis job.
  * Returns a jobId to track progress.
  * Query Params:
- * - platform: 'am-fuse' | 'am-ads' | 'default' (default: 'default')
+ * - platform: string (id of the platform to use)
  */
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
   try {
@@ -89,16 +152,18 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype;
     
     // Determine platform
-    let platform = req.query.platform;
-    if (!platform || !['am-fuse', 'am-ads'].includes(platform)) {
-      platform = 'default';
+    const platformId = req.query.platform || 'default';
+    const platformConfig = platforms.find(p => p.id === platformId) || platforms.find(p => p.id === 'default');
+    
+    if (!platformConfig) {
+       return res.status(500).json({ error: 'Configuration error: No default platform found.' });
     }
 
     // Initialize job status
-    jobs.set(jobId, { status: 'processing', submittedAt: new Date(), platform });
+    jobs.set(jobId, { status: 'processing', submittedAt: new Date(), platform: platformConfig.name });
 
     // Start processing asynchronously (fire and forget)
-    processImage(jobId, base64Image, mimeType, platform);
+    processImage(jobId, base64Image, mimeType, platformConfig);
 
     res.json({
       jobId,
@@ -130,19 +195,38 @@ app.get('/api/status/:jobId', (req, res) => {
 /**
  * Helper function to process the image using Gemini
  */
-async function processImage(jobId, base64Image, mimeType, platform) {
+async function processImage(jobId, base64Image, mimeType, platformConfig) {
   try {
     const model = "gemini-3-pro-preview";
-    // Select the prompt based on the platform
-    const prompt = PROMPTS[platform];
+    let prompt = platformConfig.prompt;
+    const parts = [
+      { inlineData: { mimeType, data: base64Image } }
+    ];
+
+    // Inject reference logo if available in platform config
+    if (platformConfig.referenceLogo) {
+      parts.push({
+        inlineData: {
+          mimeType: "image/png",
+          data: platformConfig.referenceLogo,
+        },
+      });
+      prompt += `
+      
+      IMPORTANT: A second image has been provided as a REFERENCE. 
+      This reference image contains a specific logo or visual element that is critical.
+      You must identify this specific element within the main image (the first image).
+      - Ensure the bounding box and polygon outline for this referenced element are pixel-perfect.
+      - Verify that the extracted element matches the visual characteristics of the reference.
+      `;
+    }
+
+    parts.push({ text: prompt });
 
     const response = await ai.models.generateContent({
       model: model,
       contents: {
-        parts: [
-          { inlineData: { mimeType, data: base64Image } },
-          { text: prompt }
-        ]
+        parts: parts
       },
       config: {
         thinkingConfig: { thinkingBudget: 32768 },

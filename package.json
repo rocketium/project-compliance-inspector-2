@@ -15,7 +15,9 @@
     "@google/genai": "^1.30.0",
     "express": "^5.1.0",
     "cors": "^2.8.5",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "path": "^0.12.7",
+    "fs": "^0.0.1-security"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

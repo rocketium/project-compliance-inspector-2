@@ -1,0 +1,20 @@
+[
+  {
+    "id": "default",
+    "name": "Default",
+    "description": "Standard detailed analysis",
+    "prompt": "\n      Analyze this advertisement or design image in extreme detail.\n      \n      Your task is to decompose the image into its constituent parts for a design system.\n      Identify all distinct elements:\n      1. Text blocks (headlines, body copy, disclaimers, prices).\n      2. Visual elements (product shots, logos, icons, buttons, graphical shapes).\n      \n      For each element identified:\n      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.\n      - Provide the exact text content (if it is text) or a concise visual description (if it is an image).\n      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.\n      - Provide a detailed polygon outline (list of x,y coordinates) that tightly encloses the element, also normalized to 0-1000 scale.\n      \n      Be very precise with the boundaries. Do not overlap boxes if possible unless elements are nested.\n      Ensure every visible piece of significant content is captured.\n    "
+  },
+  {
+    "id": "am-fuse",
+    "name": "AM Fuse",
+    "description": "Modular design system extraction",
+    "prompt": "\n      Analyze this image specifically for the AM Fuse platform.\n      \n      Focus on identifying elements that can be fused or recombined in a modular design system.\n      Pay special attention to:\n      1. Isolated visual assets suitable for reuse (backgrounds, extracted products).\n      2. Structural layout containers.\n      3. Typography and branding elements.\n      \n      For each element identified:\n      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.\n      - Provide the exact text content or visual description.\n      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.\n      - Provide a detailed polygon outline (list of x,y coordinates) normalized to 0-1000 scale for precise extraction.\n    "
+  },
+  {
+    "id": "am-ads",
+    "name": "AM Ads",
+    "description": "Ad performance and compliance analysis",
+    "prompt": "\n      Analyze this image specifically for the AM Ads platform.\n      \n      Focus on ad-specific components, compliance, and performance drivers.\n      Identify:\n      1. Ad copy and messaging hierarchies (Headline, CTA, Disclaimer).\n      2. Call-to-action buttons and interactive areas.\n      3. Product placement and brand visibility.\n      \n      For each element identified:\n      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.\n      - Provide the exact text content or visual description.\n      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.\n      - Provide a detailed polygon outline (list of x,y coordinates) normalized to 0-1000 scale.\n    "
+  }
+]

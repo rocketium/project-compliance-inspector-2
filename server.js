@@ -2,9 +2,12 @@ import express from 'express';
 import multer from 'multer';
 import cors from 'cors';
 import { GoogleGenAI, Type } from '@google/genai';
+import fs from 'fs/promises';
+import path from 'path';
 
 const app = express();
 const port = 3000;
+const DATA_FILE = path.resolve('platforms.json');
 
 // Increase payload limit for base64 images in JSON body (reference logos)
 app.use(express.json({ limit: '50mb' }));
@@ -21,8 +24,8 @@ const jobs = new Map();
 // Initialize Gemini
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// Initial Platform Data (Migrated from static PROMPTS)
-let platforms = [
+// Minimal Default Fallback (in case file is missing)
+const DEFAULT_PLATFORMS = [
   {
     id: 'default',
     name: 'Default',
@@ -44,48 +47,35 @@ let platforms = [
       Be very precise with the boundaries. Do not overlap boxes if possible unless elements are nested.
       Ensure every visible piece of significant content is captured.
     `
-  },
-  {
-    id: 'am-fuse',
-    name: 'AM Fuse',
-    description: 'Modular design system extraction',
-    prompt: `
-      Analyze this image specifically for the AM Fuse platform.
-      
-      Focus on identifying elements that can be fused or recombined in a modular design system.
-      Pay special attention to:
-      1. Isolated visual assets suitable for reuse (backgrounds, extracted products).
-      2. Structural layout containers.
-      3. Typography and branding elements.
-      
-      For each element identified:
-      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
-      - Provide the exact text content or visual description.
-      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
-      - Provide a detailed polygon outline (list of x,y coordinates) normalized to 0-1000 scale for precise extraction.
-    `
-  },
-  {
-    id: 'am-ads',
-    name: 'AM Ads',
-    description: 'Ad performance and compliance analysis',
-    prompt: `
-      Analyze this image specifically for the AM Ads platform.
-      
-      Focus on ad-specific components, compliance, and performance drivers.
-      Identify:
-      1. Ad copy and messaging hierarchies (Headline, CTA, Disclaimer).
-      2. Call-to-action buttons and interactive areas.
-      3. Product placement and brand visibility.
-      
-      For each element identified:
-      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
-      - Provide the exact text content or visual description.
-      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
-      - Provide a detailed polygon outline (list of x,y coordinates) normalized to 0-1000 scale.
-    `
   }
 ];
+
+let platforms = [];
+
+// Load platforms from file or initialize with defaults
+async function loadPlatforms() {
+  try {
+    const data = await fs.readFile(DATA_FILE, 'utf-8');
+    platforms = JSON.parse(data);
+    console.log('Loaded platforms from disk.');
+  } catch (err) {
+    console.log('No platform file found or error reading. Initializing with defaults.');
+    platforms = [...DEFAULT_PLATFORMS];
+    await savePlatforms();
+  }
+}
+
+// Save platforms to file
+async function savePlatforms() {
+  try {
+    await fs.writeFile(DATA_FILE, JSON.stringify(platforms, null, 2));
+  } catch (err) {
+    console.error('Error saving platforms to disk:', err);
+  }
+}
+
+// Initialize data on start
+await loadPlatforms();
 
 // --- Platform Management API ---
 
@@ -93,7 +83,7 @@ app.get('/api/platforms', (req, res) => {
   res.json(platforms);
 });
 
-app.post('/api/platforms', (req, res) => {
+app.post('/api/platforms', async (req, res) => {
   const { id, name, description, prompt, referenceLogo } = req.body;
   if (!id || !name || !prompt) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -105,10 +95,12 @@ app.post('/api/platforms', (req, res) => {
 
   const newPlatform = { id, name, description, prompt, referenceLogo };
   platforms.push(newPlatform);
+  await savePlatforms();
+  
   res.json(newPlatform);
 });
 
-app.put('/api/platforms/:id', (req, res) => {
+app.put('/api/platforms/:id', async (req, res) => {
   const { id } = req.params;
   const index = platforms.findIndex(p => p.id === id);
   
@@ -117,10 +109,12 @@ app.put('/api/platforms/:id', (req, res) => {
   }
 
   platforms[index] = { ...platforms[index], ...req.body };
+  await savePlatforms();
+  
   res.json(platforms[index]);
 });
 
-app.delete('/api/platforms/:id', (req, res) => {
+app.delete('/api/platforms/:id', async (req, res) => {
   const { id } = req.params;
   const initialLength = platforms.length;
   platforms = platforms.filter(p => p.id !== id);
@@ -129,6 +123,7 @@ app.delete('/api/platforms/:id', (req, res) => {
     return res.status(404).json({ error: 'Platform not found' });
   }
   
+  await savePlatforms();
   res.json({ success: true });
 });
 

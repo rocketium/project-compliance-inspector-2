@@ -188,6 +188,13 @@ const App: React.FC = () => {
                 <span className="font-mono text-indigo-600 font-bold ml-1">
                   {activePlatform ? activePlatform.name : 'Loading...'}
                 </span>
+                <span className="w-px h-3 bg-slate-300 mx-2"></span>
+                <button 
+                  onClick={() => setShowAdmin(true)}
+                  className="hover:text-indigo-600 hover:underline decoration-indigo-200 transition-colors"
+                >
+                  Configure
+                </button>
               </div>
               <h2 className="text-3xl font-bold text-slate-800 mb-4">Extract logic from visual chaos</h2>
               <p className="text-lg text-slate-600 leading-relaxed">

@@ -20,10 +20,63 @@ const jobs = new Map();
 // Initialize Gemini
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Define prompts for different platforms
+const PROMPTS = {
+  'default': `
+      Analyze this advertisement or design image in extreme detail.
+      
+      Your task is to decompose the image into its constituent parts for a design system.
+      Identify all distinct elements:
+      1. Text blocks (headlines, body copy, disclaimers, prices).
+      2. Visual elements (product shots, logos, icons, buttons, graphical shapes).
+      
+      For each element identified:
+      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
+      - Provide the exact text content (if it is text) or a concise visual description (if it is an image).
+      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
+      - Provide a detailed polygon outline (list of x,y coordinates) that tightly encloses the element, also normalized to 0-1000 scale.
+      
+      Be very precise with the boundaries. Do not overlap boxes if possible unless elements are nested.
+      Ensure every visible piece of significant content is captured.
+    `,
+  'am-fuse': `
+      Analyze this image specifically for the AM Fuse platform.
+      
+      Focus on identifying elements that can be fused or recombined in a modular design system.
+      Pay special attention to:
+      1. Isolated visual assets suitable for reuse (backgrounds, extracted products).
+      2. Structural layout containers.
+      3. Typography and branding elements.
+      
+      For each element identified:
+      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
+      - Provide the exact text content or visual description.
+      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
+      - Provide a detailed polygon outline (list of x,y coordinates) normalized to 0-1000 scale for precise extraction.
+    `,
+  'am-ads': `
+      Analyze this image specifically for the AM Ads platform.
+      
+      Focus on ad-specific components, compliance, and performance drivers.
+      Identify:
+      1. Ad copy and messaging hierarchies (Headline, CTA, Disclaimer).
+      2. Call-to-action buttons and interactive areas.
+      3. Product placement and brand visibility.
+      
+      For each element identified:
+      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
+      - Provide the exact text content or visual description.
+      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
+      - Provide a detailed polygon outline (list of x,y coordinates) normalized to 0-1000 scale.
+    `
+};
+
 /**
  * POST /api/analyze
  * Uploads an image and starts the analysis job.
  * Returns a jobId to track progress.
+ * Query Params:
+ * - platform: 'am-fuse' | 'am-ads' | 'default' (default: 'default')
  */
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
   try {
@@ -34,12 +87,18 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     const jobId = Date.now().toString();
     const base64Image = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype;
+    
+    // Determine platform
+    let platform = req.query.platform;
+    if (!platform || !['am-fuse', 'am-ads'].includes(platform)) {
+      platform = 'default';
+    }
 
     // Initialize job status
-    jobs.set(jobId, { status: 'processing', submittedAt: new Date() });
+    jobs.set(jobId, { status: 'processing', submittedAt: new Date(), platform });
 
     // Start processing asynchronously (fire and forget)
-    processImage(jobId, base64Image, mimeType);
+    processImage(jobId, base64Image, mimeType, platform);
 
     res.json({
       jobId,
@@ -71,26 +130,11 @@ app.get('/api/status/:jobId', (req, res) => {
 /**
  * Helper function to process the image using Gemini
  */
-async function processImage(jobId, base64Image, mimeType) {
+async function processImage(jobId, base64Image, mimeType, platform) {
   try {
     const model = "gemini-3-pro-preview";
-    const prompt = `
-      Analyze this advertisement or design image in extreme detail.
-      
-      Your task is to decompose the image into its constituent parts for a design system.
-      Identify all distinct elements:
-      1. Text blocks (headlines, body copy, disclaimers, prices).
-      2. Visual elements (product shots, logos, icons, buttons, graphical shapes).
-      
-      For each element identified:
-      - Classify it into one of these categories: 'Text', 'Logo', 'Product', 'Button', 'Other'.
-      - Provide the exact text content (if it is text) or a concise visual description (if it is an image).
-      - Provide precise bounding box coordinates (ymin, xmin, ymax, xmax) normalized to 0-1000 scale.
-      - Provide a detailed polygon outline (list of x,y coordinates) that tightly encloses the element, also normalized to 0-1000 scale.
-      
-      Be very precise with the boundaries. Do not overlap boxes if possible unless elements are nested.
-      Ensure every visible piece of significant content is captured.
-    `;
+    // Select the prompt based on the platform
+    const prompt = PROMPTS[platform];
 
     const response = await ai.models.generateContent({
       model: model,

@@ -263,6 +263,12 @@ const App: React.FC = () => {
     const p = params.get("platform");
     if (p) {
       setActivePlatformId(p);
+    } else {
+      // If no platform in query, ensure default is in URL
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set("platform", "default");
+      window.history.replaceState({}, "", newUrl);
+      setActivePlatformId("default");
     }
 
     // 3. Check for showHeader query param
@@ -276,6 +282,19 @@ const App: React.FC = () => {
       setShowAdmin(true);
     }
   }, []);
+
+  // Keep platform in sync with query parameter
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const currentPlatform = params.get("platform");
+
+    // Only update URL if it's different from current query param
+    if (currentPlatform !== activePlatformId) {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set("platform", activePlatformId);
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, [activePlatformId]);
 
   // Use derived active platform, strictly falling back if ID not found
   const activePlatform =

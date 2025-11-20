@@ -178,5 +178,34 @@
       "Channel-specific requirements must be verified (Criteo/partners may differ).",
       "In-store DOOH placements must meet physical display specifications."
     ]
+  },
+  {
+    "id": "loblaw-advance",
+    "name": "Loblaw Advance",
+    "prompt": "\n      Analyze this advertisement for Loblaw Advance media placements.\n      Focus on compliance with Loblaw Advance's prohibited activities, categories, and products policy.\n      \n      Identify:\n      1. **Product**: Product imagery. Classify as 'Product'.\n      2. **Brand/Logo**: Brand identity. Classify as 'Logo'.\n      3. **Text**: Headlines and copy. Classify as 'Text'.\n      4. **CTA**: Call-to-action buttons. Classify as 'Button'.\n      \n      For compliance evaluation:\n      - Verify content complies with all applicable laws and regulations for all locations where ads are showing.\n      - Check for prohibited content categories (health, drugs, weapons, adult content, etc.).\n      - Verify no misleading or false content is present.\n      - Assess appropriateness for general audience.\n      - Check for intellectual property and trademark compliance.\n      \n      Reference Loblaw Advance Policy on Prohibited Activities, Categories, and Products.\n    ",
+    "complianceRules": [
+      "Ads must comply with all applicable laws and regulations for all the locations where the ads are showing.",
+      "Products or services relating to physical or mental health conditions, including diseases, disease diagnostic kits, sexual health, and chronic health conditions, are prohibited.",
+      "Ads must not promote the sale or use of illegal, prescription, or recreational drugs.",
+      "Products or devices intended for pregnancy/fertility (e.g., pregnancy tests, fertility products, folic acid) are prohibited.",
+      "Medical condition-related data cannot be used where not already prohibited.",
+      "Alcohol products must be sold in Loblaw retail stores and cannot use past alcohol purchase history to build an audience for ad serving purposes.",
+      "Ads may not promote gambling services.",
+      "Ads must not promote tobacco products.",
+      "Ads must not promote marijuana purchases or products, including CBD products.",
+      "Ads must not promote pornography or related adult content.",
+      "Ads must not promote weapons, ammunition, or explosives.",
+      "Ads may not promote the sale of spy cams, mobile phone trackers, or other hidden surveillance equipment.",
+      "Ads must not promote products or items that facilitate or encourage unauthorized access to digital media.",
+      "Products or services relating to sexual orientation, personal race or ethnicity, personal religious beliefs, or political affiliations are prohibited.",
+      "Images or representations of people that display partially exposed sexual body parts such as breasts, genitals, or buttocks are prohibited.",
+      "Ads must not contain shocking, sensational, disrespectful, or excessively violent content.",
+      "Ads, landing pages, and business practices must not contain deceptive, false, or misleading content, including deceptive claims, offers, or methods.",
+      "Ads must not contain content that exploits controversial political or social issues for commercial purposes, including political opinion, religious belief, or advocacy.",
+      "Ads must not contain profanity or bad grammar and punctuation. Symbols, numbers, and letters must be used properly without the intention of circumventing ad review processes.",
+      "Ads must not contain 'before-and-after' images or images that contain unexpected or unlikely results. Ad content must not imply or attempt to generate negative self-perception to promote diet, weight loss, or other health-related products.",
+      "Ads must not incite violence or intolerance, or advocate or discriminate against a protected group, whether based on race, color, national origin, religion, disability, sex, sexual orientation, age, or another category.",
+      "Ads must not infringe or violate any third-party intellectual property (trademark/copyright) rights."
+    ]
   }
 ]

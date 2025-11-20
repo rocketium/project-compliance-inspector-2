@@ -1,8 +1,20 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AnalysisResult, AnalyzedElement } from '../types';
-import { Download, Type, Image as ImageIcon, Box, MousePointerClick, Eye, Handshake, ToggleLeft, ToggleRight, ShieldCheck, LayoutList } from 'lucide-react';
-import { ComplianceView } from './ComplianceView';
+import { AnalysisResult, AnalyzedElement, ComplianceResult } from "../types";
+import {
+  Download,
+  Type,
+  Image as ImageIcon,
+  Box,
+  MousePointerClick,
+  Eye,
+  Handshake,
+  ToggleLeft,
+  ToggleRight,
+  ShieldCheck,
+  LayoutList,
+} from "lucide-react";
+import { ComplianceView } from "./ComplianceView";
 
 interface ResultsViewProps {
   imageSrc: string;
@@ -10,19 +22,31 @@ interface ResultsViewProps {
   onReset: () => void;
   platformName?: string;
   complianceRules?: string[];
+  complianceResults?: ComplianceResult[] | null;
+  isComplianceLoading?: boolean;
 }
 
-type ViewMode = 'box' | 'outline';
-type TabMode = 'extraction' | 'compliance';
+type ViewMode = "box" | "outline";
+type TabMode = "extraction" | "compliance";
 
-export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, onReset, platformName, complianceRules }) => {
+export const ResultsView: React.FC<ResultsViewProps> = ({
+  imageSrc,
+  analysis,
+  onReset,
+  platformName,
+  complianceRules,
+  complianceResults,
+  isComplianceLoading,
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [elementsWithCrops, setElementsWithCrops] = useState<AnalyzedElement[]>([]);
+  const [elementsWithCrops, setElementsWithCrops] = useState<AnalyzedElement[]>(
+    []
+  );
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [viewMode, setViewMode] = useState<ViewMode>('box');
-  const [activeTab, setActiveTab] = useState<TabMode>('extraction');
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [viewMode, setViewMode] = useState<ViewMode>("box");
+  const [activeTab, setActiveTab] = useState<TabMode>("extraction");
 
   // Generate crops when image loads
   useEffect(() => {
@@ -30,17 +54,17 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, on
     img.src = imageSrc;
     img.onload = () => {
       const newElements = analysis.elements.map((el) => {
-        const canvas = document.createElement('canvas');
+        const canvas = document.createElement("canvas");
         const width = img.width * (el.box.xmax - el.box.xmin);
         const height = img.height * (el.box.ymax - el.box.ymin);
-        
+
         // Add some padding to crop if possible, but keep strict for now
         canvas.width = Math.max(1, width);
         canvas.height = Math.max(1, height);
-        
-        const ctx = canvas.getContext('2d');
+
+        const ctx = canvas.getContext("2d");
         if (ctx) {
-           ctx.drawImage(
+          ctx.drawImage(
             img,
             el.box.xmin * img.width,
             el.box.ymin * img.height,
@@ -59,48 +83,70 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, on
   }, [imageSrc, analysis]);
 
   // Filter logic
-  const categories = ['All', ...Array.from(new Set(elementsWithCrops.map(e => e.category)))];
-  const filteredElements = selectedCategory === 'All' 
-    ? elementsWithCrops 
-    : elementsWithCrops.filter(e => e.category === selectedCategory);
+  const categories = [
+    "All",
+    ...Array.from(new Set(elementsWithCrops.map((e) => e.category))),
+  ];
+  const filteredElements =
+    selectedCategory === "All"
+      ? elementsWithCrops
+      : elementsWithCrops.filter((e) => e.category === selectedCategory);
 
   // Helper to get color by category
   const getColor = (category: string) => {
     switch (category) {
-      case 'Text': return 'text-blue-500 border-blue-500 bg-blue-500/10';
-      case 'Button': return 'text-green-500 border-green-500 bg-green-500/10';
-      case 'Logo': return 'text-purple-500 border-purple-500 bg-purple-500/10';
-      case 'Product': return 'text-orange-500 border-orange-500 bg-orange-500/10';
-      case 'Partner': return 'text-teal-600 border-teal-600 bg-teal-500/10';
-      default: return 'text-gray-500 border-gray-500 bg-gray-500/10';
+      case "Text":
+        return "text-blue-500 border-blue-500 bg-blue-500/10";
+      case "Button":
+        return "text-green-500 border-green-500 bg-green-500/10";
+      case "Logo":
+        return "text-purple-500 border-purple-500 bg-purple-500/10";
+      case "Product":
+        return "text-orange-500 border-orange-500 bg-orange-500/10";
+      case "Partner":
+        return "text-teal-600 border-teal-600 bg-teal-500/10";
+      default:
+        return "text-gray-500 border-gray-500 bg-gray-500/10";
     }
   };
-  
+
   const getStrokeColor = (category: string) => {
-      switch (category) {
-      case 'Text': return '#3b82f6';
-      case 'Button': return '#22c55e';
-      case 'Logo': return '#a855f7';
-      case 'Product': return '#f97316';
-      case 'Partner': return '#0d9488';
-      default: return '#6b7280';
+    switch (category) {
+      case "Text":
+        return "#3b82f6";
+      case "Button":
+        return "#22c55e";
+      case "Logo":
+        return "#a855f7";
+      case "Product":
+        return "#f97316";
+      case "Partner":
+        return "#0d9488";
+      default:
+        return "#6b7280";
     }
   };
 
   const getIcon = (category: string) => {
     switch (category) {
-      case 'Text': return <Type size={16} />;
-      case 'Button': return <MousePointerClick size={16} />;
-      case 'Logo': return <Box size={16} />;
-      case 'Product': return <ImageIcon size={16} />;
-      case 'Partner': return <Handshake size={16} />;
-      default: return <Eye size={16} />;
+      case "Text":
+        return <Type size={16} />;
+      case "Button":
+        return <MousePointerClick size={16} />;
+      case "Logo":
+        return <Box size={16} />;
+      case "Product":
+        return <ImageIcon size={16} />;
+      case "Partner":
+        return <Handshake size={16} />;
+      default:
+        return <Eye size={16} />;
     }
   };
 
   // Helper to create polygon points string for SVG
-  const getPolygonPoints = (points: {x: number, y: number}[]) => {
-    return points.map(p => `${p.x * 100},${p.y * 100}`).join(' ');
+  const getPolygonPoints = (points: { x: number; y: number }[]) => {
+    return points.map((p) => `${p.x * 100},${p.y * 100}`).join(" ");
   };
 
   return (
@@ -111,60 +157,86 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, on
           <h2 className="font-semibold text-slate-700 flex items-center gap-2">
             <ImageIcon size={18} /> Original with Outlines
           </h2>
-           <div className="flex items-center gap-4">
-             <button 
-               onClick={() => setViewMode(prev => prev === 'box' ? 'outline' : 'box')}
-               className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
-             >
-               {viewMode === 'box' ? <ToggleLeft size={20} /> : <ToggleRight size={20} className="text-indigo-600" />}
-               {viewMode === 'box' ? 'Box View' : 'Outline View'}
-             </button>
-             <button onClick={onReset} className="text-sm text-red-600 hover:text-red-700 font-medium">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() =>
+                setViewMode((prev) => (prev === "box" ? "outline" : "box"))
+              }
+              className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
+            >
+              {viewMode === "box" ? (
+                <ToggleLeft size={20} />
+              ) : (
+                <ToggleRight size={20} className="text-indigo-600" />
+              )}
+              {viewMode === "box" ? "Box View" : "Outline View"}
+            </button>
+            <button
+              onClick={onReset}
+              className="text-sm text-red-600 hover:text-red-700 font-medium"
+            >
               Analyze Another
             </button>
-           </div>
+          </div>
         </div>
-        
-        <div className="relative flex-1 bg-slate-100 overflow-auto flex items-center justify-center p-4" ref={containerRef}>
+
+        <div
+          className="relative flex-1 bg-slate-100 overflow-auto flex items-center justify-center p-4"
+          ref={containerRef}
+        >
           <div className="relative shadow-lg inline-block">
-            <img 
-              src={imageSrc} 
-              alt="Analyzed" 
-              className="max-w-full max-h-[70vh] block object-contain" 
+            <img
+              src={imageSrc}
+              alt="Analyzed"
+              className="max-w-full max-h-[70vh] block object-contain"
             />
             {/* Overlay Layer */}
             <div className="absolute inset-0 pointer-events-none">
-               <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                 {elementsWithCrops.map((el) => (
-                   <g key={`svg-${el.id}`}>
-                     {viewMode === 'outline' && el.polygon && el.polygon.length > 0 ? (
-                       <polygon
-                         points={getPolygonPoints(el.polygon)}
-                         fill={hoveredId === el.id ? getStrokeColor(el.category) : 'transparent'}
-                         fillOpacity="0.2"
-                         stroke={getStrokeColor(el.category)}
-                         strokeWidth="0.5"
-                         vectorEffect="non-scaling-stroke"
-                         className="transition-all duration-200"
-                       />
-                     ) : (
-                       <rect
-                         x={el.box.xmin * 100}
-                         y={el.box.ymin * 100}
-                         width={(el.box.xmax - el.box.xmin) * 100}
-                         height={(el.box.ymax - el.box.ymin) * 100}
-                         fill={hoveredId === el.id ? getStrokeColor(el.category) : 'transparent'}
-                         fillOpacity="0.2"
-                         stroke={getStrokeColor(el.category)}
-                         strokeWidth="0.5"
-                         vectorEffect="non-scaling-stroke"
-                         className="transition-all duration-200"
-                       />
-                     )}
-                   </g>
-                 ))}
-               </svg>
-              
+              <svg
+                className="absolute inset-0 w-full h-full"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                {elementsWithCrops.map((el) => (
+                  <g key={`svg-${el.id}`}>
+                    {viewMode === "outline" &&
+                    el.polygon &&
+                    el.polygon.length > 0 ? (
+                      <polygon
+                        points={getPolygonPoints(el.polygon)}
+                        fill={
+                          hoveredId === el.id
+                            ? getStrokeColor(el.category)
+                            : "transparent"
+                        }
+                        fillOpacity="0.2"
+                        stroke={getStrokeColor(el.category)}
+                        strokeWidth="0.5"
+                        vectorEffect="non-scaling-stroke"
+                        className="transition-all duration-200"
+                      />
+                    ) : (
+                      <rect
+                        x={el.box.xmin * 100}
+                        y={el.box.ymin * 100}
+                        width={(el.box.xmax - el.box.xmin) * 100}
+                        height={(el.box.ymax - el.box.ymin) * 100}
+                        fill={
+                          hoveredId === el.id
+                            ? getStrokeColor(el.category)
+                            : "transparent"
+                        }
+                        fillOpacity="0.2"
+                        stroke={getStrokeColor(el.category)}
+                        strokeWidth="0.5"
+                        vectorEffect="non-scaling-stroke"
+                        className="transition-all duration-200"
+                      />
+                    )}
+                  </g>
+                ))}
+              </svg>
+
               {/* Interactive HTML Layer for tooltips/labels */}
               {elementsWithCrops.map((el) => (
                 <div
@@ -177,15 +249,15 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, on
                     height: `${(el.box.ymax - el.box.ymin) * 100}%`,
                   }}
                 >
-                   {/* Label tag on hover */}
-                   {hoveredId === el.id && (
-                     <div 
+                  {/* Label tag on hover */}
+                  {hoveredId === el.id && (
+                    <div
                       className="absolute -top-6 left-0 px-2 py-0.5 text-xs text-white font-bold rounded shadow-sm whitespace-nowrap z-20"
                       style={{ backgroundColor: getStrokeColor(el.category) }}
-                     >
-                       {el.category}
-                     </div>
-                   )}
+                    >
+                      {el.category}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -198,21 +270,21 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, on
         {/* Tabs */}
         <div className="flex border-b border-slate-200 bg-slate-50">
           <button
-            onClick={() => setActiveTab('extraction')}
+            onClick={() => setActiveTab("extraction")}
             className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
-              activeTab === 'extraction' 
-                ? 'border-indigo-600 text-indigo-700 bg-white' 
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+              activeTab === "extraction"
+                ? "border-indigo-600 text-indigo-700 bg-white"
+                : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-100"
             }`}
           >
             <LayoutList size={16} /> Extraction
           </button>
           <button
-            onClick={() => setActiveTab('compliance')}
+            onClick={() => setActiveTab("compliance")}
             className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
-              activeTab === 'compliance' 
-                ? 'border-indigo-600 text-indigo-700 bg-white' 
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+              activeTab === "compliance"
+                ? "border-indigo-600 text-indigo-700 bg-white"
+                : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-100"
             }`}
           >
             <ShieldCheck size={16} /> Compliance
@@ -220,99 +292,117 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ imageSrc, analysis, on
         </div>
 
         {/* Extraction Tab Content - Use CSS visibility to persist state */}
-        <div className={`flex-1 flex flex-col overflow-hidden ${activeTab === 'extraction' ? 'flex' : 'hidden'}`}>
-            <div className="p-4 border-b border-slate-100 bg-white/50">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold text-slate-700">Detailed Results</h2>
-                {platformName && (
-                  <span className="text-xs font-medium px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md border border-indigo-100">
-                    {platformName}
-                  </span>
-                )}
-              </div>
-              
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                {categories.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
-                      selectedCategory === cat 
-                        ? 'bg-slate-800 text-white' 
-                        : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
+        <div
+          className={`flex-1 flex flex-col overflow-hidden ${
+            activeTab === "extraction" ? "flex" : "hidden"
+          }`}
+        >
+          <div className="p-4 border-b border-slate-100 bg-white/50">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-slate-700">Detailed Results</h2>
+              {platformName && (
+                <span className="text-xs font-medium px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md border border-indigo-100">
+                  {platformName}
+                </span>
+              )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
-              {filteredElements.map((el) => (
-                <div 
-                  key={el.id}
-                  onMouseEnter={() => setHoveredId(el.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  className={`bg-white rounded-xl p-3 border transition-all duration-200 cursor-pointer ${
-                    hoveredId === el.id 
-                      ? 'border-blue-400 shadow-md ring-1 ring-blue-100' 
-                      : 'border-slate-200 hover:border-slate-300 shadow-sm'
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
+                    selectedCategory === cat
+                      ? "bg-slate-800 text-white"
+                      : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-100"
                   }`}
                 >
-                  <div className="flex gap-3">
-                    {/* Cropped Thumbnail */}
-                    <div className="w-20 h-20 flex-shrink-0 bg-slate-100 rounded-lg overflow-hidden border border-slate-100 flex items-center justify-center">
-                      {el.croppedImageUrl ? (
-                        <img src={el.croppedImageUrl} alt={el.category} className="w-full h-full object-contain" />
-                      ) : (
-                        <div className="animate-pulse bg-slate-200 w-full h-full" />
-                      )}
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+            {filteredElements.map((el) => (
+              <div
+                key={el.id}
+                onMouseEnter={() => setHoveredId(el.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                className={`bg-white rounded-xl p-3 border transition-all duration-200 cursor-pointer ${
+                  hoveredId === el.id
+                    ? "border-blue-400 shadow-md ring-1 ring-blue-100"
+                    : "border-slate-200 hover:border-slate-300 shadow-sm"
+                }`}
+              >
+                <div className="flex gap-3">
+                  {/* Cropped Thumbnail */}
+                  <div className="w-20 h-20 flex-shrink-0 bg-slate-100 rounded-lg overflow-hidden border border-slate-100 flex items-center justify-center">
+                    {el.croppedImageUrl ? (
+                      <img
+                        src={el.croppedImageUrl}
+                        alt={el.category}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="animate-pulse bg-slate-200 w-full h-full" />
+                    )}
+                  </div>
+
+                  {/* Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span
+                        className={`text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${getColor(
+                          el.category
+                        )} flex items-center gap-1`}
+                      >
+                        {getIcon(el.category)}
+                        {el.category}
+                      </span>
                     </div>
-                    
-                    {/* Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${getColor(el.category)} flex items-center gap-1`}>
-                          {getIcon(el.category)}
-                          {el.category}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-700 line-clamp-3 font-medium leading-relaxed">
-                        {el.content}
-                      </p>
-                      <div className="mt-2 flex gap-2">
-                         <button 
-                           onClick={(e) => {
-                             e.stopPropagation();
-                             navigator.clipboard.writeText(el.content);
-                           }}
-                           className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
-                         >
-                           <Download size={12} /> Copy Text
-                         </button>
-                      </div>
+                    <p className="text-sm text-slate-700 line-clamp-3 font-medium leading-relaxed">
+                      {el.content}
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(el.content);
+                        }}
+                        className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
+                      >
+                        <Download size={12} /> Copy Text
+                      </button>
                     </div>
                   </div>
                 </div>
-              ))}
-              
-              {filteredElements.length === 0 && (
-                <div className="text-center py-12 text-slate-400">
-                  <p>No elements found in this category.</p>
-                </div>
-              )}
-            </div>
-            <div className="p-3 border-t border-slate-100 bg-slate-50 text-center text-xs text-slate-400">
-               {elementsWithCrops.length} elements detected
-            </div>
+              </div>
+            ))}
+
+            {filteredElements.length === 0 && (
+              <div className="text-center py-12 text-slate-400">
+                <p>No elements found in this category.</p>
+              </div>
+            )}
+          </div>
+          <div className="p-3 border-t border-slate-100 bg-slate-50 text-center text-xs text-slate-400">
+            {elementsWithCrops.length} elements detected
+          </div>
         </div>
 
         {/* Compliance Tab Content - Use CSS visibility to persist state */}
-        <div className={`flex-1 flex flex-col overflow-hidden ${activeTab === 'compliance' ? 'flex' : 'hidden'}`}>
-          <ComplianceView 
-            imageSrc={imageSrc} 
-            rules={complianceRules || []} 
+        <div
+          className={`flex-1 flex flex-col overflow-hidden ${
+            activeTab === "compliance" ? "flex" : "hidden"
+          }`}
+        >
+          <ComplianceView
+            imageSrc={imageSrc}
+            rules={complianceRules || []}
+            initialResults={complianceResults}
+            isComplianceLoading={isComplianceLoading}
           />
         </div>
       </div>

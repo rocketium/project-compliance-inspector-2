@@ -1,8 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
-import { analyzeImageWithGemini } from './services/gemini';
-import { AnalysisResult, AppState, PlatformConfig } from './types';
-import { ResultsView } from './components/ResultsView';
+import {
+  analyzeImageWithGemini,
+  checkComplianceWithGemini,
+} from "./services/gemini";
+import {
+  AnalysisResult,
+  AppState,
+  PlatformConfig,
+  ComplianceResult,
+} from "./types";
+import { ResultsView } from "./components/ResultsView";
 import {
   UploadCloud,
   FileImage,
@@ -250,6 +258,10 @@ const App: React.FC = () => {
   const [showAdmin, setShowAdmin] = useState(false);
   const [showHeader, setShowHeader] = useState(false);
   const [showPlatformDropdown, setShowPlatformDropdown] = useState(false);
+  const [complianceResults, setComplianceResults] = useState<
+    ComplianceResult[] | null
+  >(null);
+  const [isComplianceLoading, setIsComplianceLoading] = useState(false);
 
   // Platform Management
   const [platforms, setPlatforms] =
@@ -380,6 +392,28 @@ const App: React.FC = () => {
       );
       setAnalysisResult(result);
       setAppState(AppState.SUCCESS);
+
+      // Run compliance check asynchronously (don't await)
+      if (
+        activePlatform.complianceRules &&
+        activePlatform.complianceRules.length > 0
+      ) {
+        setIsComplianceLoading(true);
+        checkComplianceWithGemini(
+          base64Data,
+          mimeType,
+          activePlatform.complianceRules
+        )
+          .then((results) => {
+            setComplianceResults(results);
+            setIsComplianceLoading(false);
+          })
+          .catch((err) => {
+            console.error("Compliance check failed", err);
+            setIsComplianceLoading(false);
+            // Optionally set error state or handle silently
+          });
+      }
     } catch (err: any) {
       console.error(err);
       // Handle JSON parse errors from HTML responses
@@ -405,6 +439,8 @@ const App: React.FC = () => {
     setImagePreview(null);
     setAnalysisResult(null);
     setErrorMsg(null);
+    setComplianceResults(null);
+    setIsComplianceLoading(false);
   };
 
   // Render Admin Panel
@@ -639,6 +675,8 @@ const App: React.FC = () => {
               onReset={handleReset}
               platformName={activePlatform.name}
               complianceRules={activePlatform.complianceRules}
+              complianceResults={complianceResults}
+              isComplianceLoading={isComplianceLoading}
             />
           </div>
         )}

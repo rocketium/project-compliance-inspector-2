@@ -256,7 +256,6 @@ const App: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [thinkingTime, setThinkingTime] = useState(0);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [showHeader, setShowHeader] = useState(false);
   const [showPlatformDropdown, setShowPlatformDropdown] = useState(false);
   const [complianceResults, setComplianceResults] = useState<
     ComplianceResult[] | null
@@ -313,13 +312,7 @@ const App: React.FC = () => {
       setActivePlatformId("default");
     }
 
-    // 3. Check for showHeader query param
-    const showHeaderParam = params.get("showHeader");
-    if (showHeaderParam === "true" || showHeaderParam === "1") {
-      setShowHeader(true);
-    }
-
-    // 4. Check routing
+    // 3. Check routing
     if (window.location.pathname === "/admin") {
       setShowAdmin(true);
     }
@@ -463,9 +456,8 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Header - Only shown if showHeader query param is true */}
-      {showHeader && (
-        <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="bg-indigo-600 p-1.5 rounded-lg">
@@ -532,7 +524,6 @@ const App: React.FC = () => {
             </div>
           </div>
         </header>
-      )}
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         {/* IDLE STATE: Upload */}

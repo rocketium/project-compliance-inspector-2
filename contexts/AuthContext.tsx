@@ -24,11 +24,24 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [user, setUser] = useState<User | null>(null);
+  // Authentication disabled - using mock user
+  const mockUser = {
+    id: "mock-user-id",
+    email: "demo@local.dev",
+    app_metadata: {},
+    user_metadata: {},
+    aud: "authenticated",
+    created_at: new Date().toISOString(),
+  } as User;
+
+  const [user, setUser] = useState<User | null>(mockUser);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // Authentication disabled - no-op
+    // Original authentication code commented out for easy re-enabling
+    /*
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       // Validate email domain on session load
@@ -68,42 +81,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     });
 
     return () => subscription.unsubscribe();
+    */
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Validate email domain
-    if (!email.endsWith("@rocketium.com")) {
-      return {
-        error: { message: "Only @rocketium.com email addresses are allowed." },
-      };
-    }
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    return { error };
+    // Authentication disabled - no-op
+    return { error: null };
   };
 
   const signUp = async (email: string, password: string) => {
-    // Validate email domain
-    if (!email.endsWith("@rocketium.com")) {
-      return {
-        error: { message: "Only @rocketium.com email addresses are allowed." },
-      };
-    }
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    return { error };
+    // Authentication disabled - no-op
+    return { error: null };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Authentication disabled - no-op
+    console.log("Sign out called (authentication disabled)");
   };
 
   const value = {

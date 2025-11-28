@@ -820,7 +820,7 @@ const ThemeToggle: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { user, loading: authLoading, signOut } = useAuth();
+  // const { user, loading: authLoading, signOut } = useAuth();
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -1059,22 +1059,22 @@ const AppContent: React.FC = () => {
     localStorage.removeItem("adAnalyzerResults");
   };
 
-  // Show loading state while checking authentication
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-slate-200 dark:border-slate-700 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600 dark:text-slate-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  // // Show loading state while checking authentication
+  // if (authLoading) {
+  //   return (
+  //     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+  //       <div className="text-center">
+  //         <div className="w-16 h-16 border-4 border-slate-200 dark:border-slate-700 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+  //         <p className="text-slate-600 dark:text-slate-400">Loading...</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   // Show login page if not authenticated
-  if (!user) {
-    return <Login />;
-  }
+  // if (!user) {
+  //   return <Login />;
+  // }
 
   // Render Admin Panel
   if (showAdmin) {
@@ -1107,18 +1107,18 @@ const AppContent: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             {/* User Email */}
-            <span className="text-sm text-slate-600 dark:text-slate-400 hidden sm:block">
+            {/* <span className="text-sm text-slate-600 dark:text-slate-400 hidden sm:block">
               {user?.email}
-            </span>
+            </span> */}
 
             {/* Sign Out Button */}
-            <button
+            {/* <button
               onClick={signOut}
               className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"
               title="Sign Out"
             >
               <LogOut size={20} />
-            </button>
+            </button> */}
 
             {/* Platform Dropdown */}
             <div className="relative">

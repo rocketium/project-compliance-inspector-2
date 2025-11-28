@@ -302,6 +302,119 @@ export const checkComplianceWithGemini = async (
 };
 
 /**
+ * Auto-fix a failed compliance rule using AI.
+ * Takes the failing rule context, finds related data from extraction results,
+ * and generates a visual fix suggestion (image) using Gemini.
+ */
+export const autoFixRuleWithGemini = async (
+  base64Image: string,
+  mimeType: string,
+  failedRule: ComplianceResult,
+  extractionResults: AnalysisResult
+): Promise<string> => {
+  try {
+    // Find related elements from extraction that might be relevant to the rule
+    const relevantElements = extractionResults.elements.filter((el) => {
+      const ruleLower = failedRule.rule.toLowerCase();
+      const contentLower = el.content.toLowerCase();
+      const categoryLower = el.category.toLowerCase();
+
+      // Check if element content or category relates to the rule
+      return (
+        ruleLower.includes(categoryLower) ||
+        ruleLower.includes(contentLower) ||
+        contentLower.includes(ruleLower.split(" ")[0]) ||
+        // Check for common keywords
+        (ruleLower.includes("logo") && categoryLower === "logo") ||
+        (ruleLower.includes("text") && categoryLower === "text") ||
+        (ruleLower.includes("button") && categoryLower === "button") ||
+        (ruleLower.includes("product") && categoryLower === "product")
+      );
+    });
+
+    // Build context from relevant elements
+    const elementsContext = relevantElements
+      .map(
+        (el, idx) =>
+          `${idx + 1}. ${el.category}: "${el.content}" (position: ${Math.round(
+            el.box.xmin * 100
+          )}%, ${Math.round(el.box.ymin * 100)}%)`
+      )
+      .join("\n");
+
+    const model = "gemini-3-pro-image-preview";
+
+    const prompt = `
+You are an expert design compliance advisor. A compliance rule has failed, and you need to generate a FIXED version of the image.
+
+FAILED RULE:
+"${failedRule.rule}"
+
+CURRENT STATUS:
+- Status: ${failedRule.status}
+- Reasoning: ${failedRule.reasoning}
+${failedRule.suggestion ? `- Existing Suggestion: ${failedRule.suggestion}` : ""}
+
+RELEVANT ELEMENTS EXTRACTED FROM THE IMAGE:
+${elementsContext || "No directly related elements found, but analyze the full image context."}
+
+TASK:
+Generate a COMPLETE, FIXED version of the image that complies with the rule. The image should:
+1. Be the final, corrected version - NOT an annotated or marked-up version
+2. Show all the fixes applied (moved elements, resized elements, changed colors, added elements, etc.)
+3. Be production-ready and visually polished
+4. Maintain the same overall design aesthetic and quality as the original
+5. Fix the specific compliance issue mentioned in the rule
+
+Do NOT include annotations, arrows, boxes, or any markup. Generate the actual fixed image that a designer would create after applying the fix.
+`;
+
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Image,
+            },
+          },
+          {
+            text: prompt,
+          },
+        ],
+      },
+      config: {
+        responseModalities: ['TEXT', 'IMAGE'],
+        imageConfig: {
+          aspectRatio: '16:9',
+          imageSize: 'LARGE',
+        },
+      },
+    });
+
+    // Extract image from response
+    const responseAny = response as any;
+    
+    // Access image through candidates[0].content.parts
+    if (responseAny.candidates?.[0]?.content?.parts) {
+      for (const part of responseAny.candidates[0].content.parts) {
+        if (part.inlineData) {
+          const imageData = part.inlineData.data;
+          const imageMimeType = part.inlineData.mimeType || "image/png";
+          return `data:${imageMimeType};base64,${imageData}`;
+        }
+      }
+    }
+
+    throw new Error("No image response received from AI");
+  } catch (error) {
+    console.error("Error generating auto-fix:", error);
+    throw error;
+  }
+};
+
+/**
  * Calculate compliance scores from results
  */
 export const calculateComplianceScores = (

@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   LayoutList,
   Info,
+  Sparkles,
 } from "lucide-react";
 import { Popover } from "antd";
 import { ComplianceView } from "./ComplianceView";
@@ -68,16 +69,32 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
     null
   );
   const [showMetadata, setShowMetadata] = useState(false);
+  // Image versions: original + all generated fixes
+  const [imageVersions, setImageVersions] = useState<
+    Array<{ id: string; src: string; label: string; ruleIndex?: number }>
+  >([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
 
   // Extract image metadata
   useEffect(() => {
     extractImageMetadata(imageFile || null, imageSrc).then(setImageMetadata);
   }, [imageSrc, imageFile]);
 
-  // Generate crops when image loads
+  // Initialize image versions with original image
+  useEffect(() => {
+    if (imageSrc) {
+      setImageVersions([{ id: "original", src: imageSrc, label: "Original" }]);
+      setSelectedImageIndex(0);
+    }
+  }, [imageSrc]);
+
+  // Get the currently displayed image
+  const displayImageSrc = imageVersions[selectedImageIndex]?.src || imageSrc;
+
+  // Generate crops when image loads (always use original image for overlays)
   useEffect(() => {
     const img = new Image();
-    img.src = imageSrc;
+    img.src = imageSrc; // Always use original for element detection
     img.onload = () => {
       const newElements = analysis.elements.map((el) => {
         const canvas = document.createElement("canvas");
@@ -177,7 +194,38 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
 
   return (
     <div className="flex flex-col lg:flex-row h-full gap-6 overflow-hidden">
-      {/* Left Panel: Image Overlay */}
+      {/* Left: Vertical Carousel (only show if there are multiple versions) */}
+      {imageVersions.length > 1 && (
+        <div className="w-20 flex-shrink-0 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="p-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <h3 className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase text-center">
+              Versions
+            </h3>
+          </div>
+          <div className="p-2 space-y-2 overflow-y-auto h-[calc(100%-50px)]">
+            {imageVersions.map((version, idx) => (
+              <button
+                key={version.id}
+                onClick={() => setSelectedImageIndex(idx)}
+                className={`w-full aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                  selectedImageIndex === idx
+                    ? "border-indigo-600 dark:border-indigo-400 ring-2 ring-indigo-200 dark:ring-indigo-800"
+                    : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+                }`}
+                title={version.label}
+              >
+                <img
+                  src={version.src}
+                  alt={version.label}
+                  className="w-full h-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Center Panel: Image Overlay */}
       <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden min-h-[400px]">
         <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
           <h2 className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
@@ -252,81 +300,91 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           >
             <div className="relative shadow-lg inline-block">
               <img
-                src={imageSrc}
-                alt="Analyzed"
+                src={displayImageSrc}
+                alt={imageVersions[selectedImageIndex]?.label || "Analyzed"}
                 className="max-w-full max-h-[60vh] block object-contain"
               />
-              {/* Overlay Layer */}
-              <div className="absolute inset-0 pointer-events-none">
-                <svg
-                  className="absolute inset-0 w-full h-full"
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                >
-                  {elementsWithCrops.map((el) => (
-                    <g key={`svg-${el.id}`}>
-                      {viewMode === "outline" &&
-                      el.polygon &&
-                      el.polygon.length > 0 ? (
-                        <polygon
-                          points={getPolygonPoints(el.polygon)}
-                          fill={
-                            hoveredId === el.id
-                              ? getStrokeColor(el.category)
-                              : "transparent"
-                          }
-                          fillOpacity="0.2"
-                          stroke={getStrokeColor(el.category)}
-                          strokeWidth="0.5"
-                          vectorEffect="non-scaling-stroke"
-                          className="transition-all duration-200"
-                        />
-                      ) : (
-                        <rect
-                          x={el.box.xmin * 100}
-                          y={el.box.ymin * 100}
-                          width={(el.box.xmax - el.box.xmin) * 100}
-                          height={(el.box.ymax - el.box.ymin) * 100}
-                          fill={
-                            hoveredId === el.id
-                              ? getStrokeColor(el.category)
-                              : "transparent"
-                          }
-                          fillOpacity="0.2"
-                          stroke={getStrokeColor(el.category)}
-                          strokeWidth="0.5"
-                          vectorEffect="non-scaling-stroke"
-                          className="transition-all duration-200"
-                        />
-                      )}
-                    </g>
-                  ))}
-                </svg>
-
-                {/* Interactive HTML Layer for tooltips/labels */}
-                {elementsWithCrops.map((el) => (
-                  <div
-                    key={el.id}
-                    className="absolute"
-                    style={{
-                      top: `${el.box.ymin * 100}%`,
-                      left: `${el.box.xmin * 100}%`,
-                      width: `${(el.box.xmax - el.box.xmin) * 100}%`,
-                      height: `${(el.box.ymax - el.box.ymin) * 100}%`,
-                    }}
+              {/* Version label overlay */}
+              {imageVersions.length > 1 && (
+                <div className="absolute top-2 left-2 bg-indigo-600 dark:bg-indigo-500 text-white px-2 py-1 rounded text-xs font-medium shadow-lg">
+                  {imageVersions[selectedImageIndex]?.label}
+                </div>
+              )}
+              {/* Overlay Layer - Only show on original image */}
+              {selectedImageIndex === 0 && (
+                <div className="absolute inset-0 pointer-events-none">
+                  <svg
+                    className="absolute inset-0 w-full h-full"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
                   >
-                    {/* Label tag on hover */}
-                    {hoveredId === el.id && (
-                      <div
-                        className="absolute -top-6 left-0 px-2 py-0.5 text-xs text-white font-bold rounded shadow-sm whitespace-nowrap z-20"
-                        style={{ backgroundColor: getStrokeColor(el.category) }}
-                      >
-                        {el.category}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+                    {elementsWithCrops.map((el) => (
+                      <g key={`svg-${el.id}`}>
+                        {viewMode === "outline" &&
+                        el.polygon &&
+                        el.polygon.length > 0 ? (
+                          <polygon
+                            points={getPolygonPoints(el.polygon)}
+                            fill={
+                              hoveredId === el.id
+                                ? getStrokeColor(el.category)
+                                : "transparent"
+                            }
+                            fillOpacity="0.2"
+                            stroke={getStrokeColor(el.category)}
+                            strokeWidth="0.5"
+                            vectorEffect="non-scaling-stroke"
+                            className="transition-all duration-200"
+                          />
+                        ) : (
+                          <rect
+                            x={el.box.xmin * 100}
+                            y={el.box.ymin * 100}
+                            width={(el.box.xmax - el.box.xmin) * 100}
+                            height={(el.box.ymax - el.box.ymin) * 100}
+                            fill={
+                              hoveredId === el.id
+                                ? getStrokeColor(el.category)
+                                : "transparent"
+                            }
+                            fillOpacity="0.2"
+                            stroke={getStrokeColor(el.category)}
+                            strokeWidth="0.5"
+                            vectorEffect="non-scaling-stroke"
+                            className="transition-all duration-200"
+                          />
+                        )}
+                      </g>
+                    ))}
+                  </svg>
+
+                  {/* Interactive HTML Layer for tooltips/labels */}
+                  {elementsWithCrops.map((el) => (
+                    <div
+                      key={el.id}
+                      className="absolute"
+                      style={{
+                        top: `${el.box.ymin * 100}%`,
+                        left: `${el.box.xmin * 100}%`,
+                        width: `${(el.box.xmax - el.box.xmin) * 100}%`,
+                        height: `${(el.box.ymax - el.box.ymin) * 100}%`,
+                      }}
+                    >
+                      {/* Label tag on hover */}
+                      {hoveredId === el.id && (
+                        <div
+                          className="absolute -top-6 left-0 px-2 py-0.5 text-xs text-white font-bold rounded shadow-sm whitespace-nowrap z-20"
+                          style={{
+                            backgroundColor: getStrokeColor(el.category),
+                          }}
+                        >
+                          {el.category}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </ZoomPanControls>
@@ -474,6 +532,27 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             isComplianceLoading={isComplianceLoading}
             imageFile={imageFile}
             imageSpecs={imageSpecs}
+            extractionResults={analysis}
+            onImageFixGenerated={(
+              imageDataUrl: string,
+              ruleIndex: number,
+              ruleLabel: string
+            ) => {
+              // Add the new fixed image to versions
+              const newVersion = {
+                id: `fix-${ruleIndex}-${Date.now()}`,
+                src: imageDataUrl,
+                label: `Fix: ${ruleLabel.substring(0, 20)}${
+                  ruleLabel.length > 20 ? "..." : ""
+                }`,
+                ruleIndex: ruleIndex,
+              };
+              setImageVersions((prev) => {
+                const updated = [...prev, newVersion];
+                setSelectedImageIndex(updated.length - 1); // Select the newly generated image
+                return updated;
+              });
+            }}
           />
         </div>
       </div>

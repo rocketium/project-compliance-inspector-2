@@ -1,9 +1,16 @@
 
 import React, { useState, useEffect } from "react";
-import { ComplianceResult, ComplianceScores, ImageMetadata, ImageSpec } from "../types";
+import {
+  ComplianceResult,
+  ComplianceScores,
+  ImageMetadata,
+  ImageSpec,
+  AnalysisResult,
+} from "../types";
 import {
   checkComplianceWithGemini,
   calculateComplianceScores,
+  autoFixRuleWithGemini,
 } from "../services/gemini";
 import {
   ShieldCheck,
@@ -18,10 +25,17 @@ import {
   BarChart3,
   ListChecks,
   Scan,
+  Sparkles,
+  Image as ImageIcon,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Spinner } from "./Spinner";
 import { ComplianceDashboard } from "./ComplianceDashboard";
-import { ImageMetadataDisplay, extractImageMetadata } from "./ImageMetadataDisplay";
+import {
+  ImageMetadataDisplay,
+  extractImageMetadata,
+} from "./ImageMetadataDisplay";
 
 interface ComplianceViewProps {
   imageSrc: string;
@@ -30,6 +44,12 @@ interface ComplianceViewProps {
   isComplianceLoading?: boolean;
   imageFile?: File | null;
   imageSpecs?: ImageSpec;
+  extractionResults?: AnalysisResult;
+  onImageFixGenerated?: (
+    imageDataUrl: string,
+    ruleIndex: number,
+    ruleLabel: string
+  ) => void;
 }
 
 type ViewTab = "dashboard" | "details";
@@ -41,6 +61,8 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
   isComplianceLoading = false,
   imageFile,
   imageSpecs,
+  extractionResults,
+  onImageFixGenerated,
 }) => {
   const [results, setResults] = useState<ComplianceResult[]>([]);
   const [scores, setScores] = useState<ComplianceScores | null>(null);
@@ -49,8 +71,14 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState<ViewTab>("dashboard");
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [imageMetadata, setImageMetadata] = useState<ImageMetadata | null>(null);
+  const [imageMetadata, setImageMetadata] = useState<ImageMetadata | null>(
+    null
+  );
   const [isSpecsExpanded, setIsSpecsExpanded] = useState(true);
+  const [fixingRuleIndex, setFixingRuleIndex] = useState<number | null>(null);
+  const [autoFixResults, setAutoFixResults] = useState<Record<number, string>>(
+    {}
+  );
 
   // Extract image metadata
   useEffect(() => {
@@ -115,6 +143,53 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
     setExpandedItems(newExpanded);
   };
 
+  const handleAutoFix = async (ruleIndex: number) => {
+    if (!extractionResults || !imageSrc) {
+      console.error("Missing extraction results or image source");
+      return;
+    }
+
+    const rule = results[ruleIndex];
+    if (!rule || rule.status === "PASS") {
+      return;
+    }
+
+    setFixingRuleIndex(ruleIndex);
+
+    try {
+      const base64Data = imageSrc.split(",")[1];
+      const mimeType = imageSrc.substring(
+        imageSrc.indexOf(":") + 1,
+        imageSrc.indexOf(";")
+      );
+
+      const fixSuggestion = await autoFixRuleWithGemini(
+        base64Data,
+        mimeType,
+        rule,
+        extractionResults
+      );
+
+      setAutoFixResults((prev) => ({
+        ...prev,
+        [ruleIndex]: fixSuggestion,
+      }));
+
+      // Notify parent component about the new fixed image
+      if (onImageFixGenerated) {
+        onImageFixGenerated(fixSuggestion, ruleIndex, rule.rule);
+      }
+    } catch (error) {
+      console.error("Auto-fix failed:", error);
+      setAutoFixResults((prev) => ({
+        ...prev,
+        [ruleIndex]: "Error generating fix suggestion. Please try again.",
+      }));
+    } finally {
+      setFixingRuleIndex(null);
+    }
+  };
+
   const passedCount = results.filter((r) => r.status === "PASS").length;
   const failedCount = results.filter((r) => r.status === "FAIL").length;
   const warningCount = results.filter((r) => r.status === "WARNING").length;
@@ -151,10 +226,14 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
 
   const getCategoryBadge = (category?: string) => {
     const colors: Record<string, string> = {
-      brand: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
-      accessibility: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
-      policy: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300",
-      quality: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
+      brand:
+        "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
+      accessibility:
+        "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
+      policy:
+        "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300",
+      quality:
+        "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
     };
     return category ? (
       <span
@@ -175,7 +254,9 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
           className="mb-4 text-slate-300 dark:text-slate-600"
         />
         <p className="text-lg font-medium">No compliance rules defined.</p>
-        <p className="text-sm">Configure rules for this platform in Settings.</p>
+        <p className="text-sm">
+          Configure rules for this platform in Settings.
+        </p>
       </div>
     );
   }
@@ -260,7 +341,7 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
                   <ChevronDown size={18} className="text-slate-400" />
                 )}
               </button>
-              
+
               {/* Collapsible Content */}
               {isSpecsExpanded && (
                 <div className="px-4 pb-4">
@@ -306,9 +387,13 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
               {failedCount > 0 && (
                 <div className="mt-4 bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border border-red-100 dark:border-red-800">
                   <div className="flex items-center gap-2 mb-3">
-                    <Wrench size={16} className="text-red-600 dark:text-red-400" />
+                    <Wrench
+                      size={16}
+                      className="text-red-600 dark:text-red-400"
+                    />
                     <h4 className="text-sm font-semibold text-red-800 dark:text-red-300">
-                      {failedCount} Issue{failedCount > 1 ? "s" : ""} Need Attention
+                      {failedCount} Issue{failedCount > 1 ? "s" : ""} Need
+                      Attention
                     </h4>
                   </div>
                   <div className="space-y-2">
@@ -446,10 +531,7 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
                               {res.status}
                             </span>
                             {isExpanded ? (
-                              <ChevronUp
-                                size={16}
-                                className="text-slate-400"
-                              />
+                              <ChevronUp size={16} className="text-slate-400" />
                             ) : (
                               <ChevronDown
                                 size={16}
@@ -481,7 +563,7 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
                                   size={14}
                                   className="text-amber-500 flex-shrink-0 mt-0.5"
                                 />
-                                <div>
+                                <div className="flex-1">
                                   <p className="text-[10px] uppercase font-semibold text-amber-700 dark:text-amber-400 mb-1">
                                     How to Fix
                                   </p>
@@ -490,6 +572,71 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
                                   </p>
                                 </div>
                               </div>
+                            </div>
+                          )}
+
+                          {/* Auto Fix Button and Result */}
+                          {res.status !== "PASS" && extractionResults && (
+                            <div className="mt-3">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAutoFix(originalIndex);
+                                }}
+                                disabled={fixingRuleIndex === originalIndex}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-xs font-medium rounded-lg transition-colors disabled:cursor-not-allowed"
+                              >
+                                {fixingRuleIndex === originalIndex ? (
+                                  <>
+                                    <Spinner className="w-3 h-3" />
+                                    Generating Fix...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles size={14} />
+                                    Auto Fix Using AI
+                                  </>
+                                )}
+                              </button>
+                              {autoFixResults[originalIndex] && (
+                                <div className="mt-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 border border-indigo-100 dark:border-indigo-800">
+                                  <div className="flex items-start gap-2">
+                                    <Sparkles
+                                      size={14}
+                                      className="text-indigo-500 flex-shrink-0 mt-0.5"
+                                    />
+                                    <div className="flex-1">
+                                      <p className="text-[10px] uppercase font-semibold text-indigo-700 dark:text-indigo-400 mb-2">
+                                        AI-Generated Fix
+                                      </p>
+                                      {autoFixResults[originalIndex].startsWith(
+                                        "data:image"
+                                      ) ? (
+                                        <div className="rounded-lg overflow-hidden border border-indigo-200 dark:border-indigo-800">
+                                          <img
+                                            src={autoFixResults[originalIndex]}
+                                            alt="AI-generated fix visualization"
+                                            className="w-full h-auto max-h-96 object-contain"
+                                          />
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs text-indigo-900 dark:text-indigo-200 leading-relaxed">
+                                          {autoFixResults[originalIndex]}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              {autoFixResults[originalIndex] &&
+                                onImageFixGenerated && (
+                                  <div className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                                    <Sparkles size={12} />
+                                    <span>
+                                      Fixed image added to preview carousel
+                                    </span>
+                                  </div>
+                                )}
                             </div>
                           )}
                         </div>
@@ -514,11 +661,7 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
               disabled={isLoading}
               className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium flex items-center gap-2 disabled:opacity-50"
             >
-              {isLoading ? (
-                <Spinner className="w-4 h-4" />
-              ) : (
-                <Play size={14} />
-              )}
+              {isLoading ? <Spinner className="w-4 h-4" /> : <Play size={14} />}
               {isLoading ? "Re-checking..." : "Re-run Check"}
             </button>
           </div>

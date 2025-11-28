@@ -533,6 +533,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             imageFile={imageFile}
             imageSpecs={imageSpecs}
             extractionResults={analysis}
+            latestImageVersion={
+              imageVersions[imageVersions.length - 1]?.src || imageSrc
+            }
             onImageFixGenerated={(
               imageDataUrl: string,
               ruleIndex: number,

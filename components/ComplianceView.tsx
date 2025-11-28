@@ -62,6 +62,7 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
   imageFile,
   imageSpecs,
   extractionResults,
+  latestImageVersion,
   onImageFixGenerated,
 }) => {
   const [results, setResults] = useState<ComplianceResult[]>([]);
@@ -157,10 +158,13 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
     setFixingRuleIndex(ruleIndex);
 
     try {
-      const base64Data = imageSrc.split(",")[1];
-      const mimeType = imageSrc.substring(
-        imageSrc.indexOf(":") + 1,
-        imageSrc.indexOf(";")
+      // Use the latest image version if available, otherwise use original
+      // This allows fixes to build on top of each other
+      const inputImage = latestImageVersion || imageSrc;
+      const base64Data = inputImage.split(",")[1];
+      const mimeType = inputImage.substring(
+        inputImage.indexOf(":") + 1,
+        inputImage.indexOf(";")
       );
 
       const fixSuggestion = await autoFixRuleWithGemini(

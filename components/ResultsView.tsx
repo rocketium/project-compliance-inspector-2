@@ -1,6 +1,12 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AnalysisResult, AnalyzedElement, ComplianceResult } from "../types";
+import {
+  AnalysisResult,
+  AnalyzedElement,
+  ComplianceResult,
+  ImageMetadata,
+  ImageSpec,
+} from "../types";
 import {
   Download,
   Type,
@@ -13,8 +19,15 @@ import {
   ToggleRight,
   ShieldCheck,
   LayoutList,
+  Info,
 } from "lucide-react";
+import { Popover } from "antd";
 import { ComplianceView } from "./ComplianceView";
+import { ZoomPanControls } from "./ZoomPanControls";
+import {
+  ImageMetadataDisplay,
+  extractImageMetadata,
+} from "./ImageMetadataDisplay";
 
 interface ResultsViewProps {
   imageSrc: string;
@@ -24,6 +37,8 @@ interface ResultsViewProps {
   complianceRules?: string[];
   complianceResults?: ComplianceResult[] | null;
   isComplianceLoading?: boolean;
+  imageFile?: File | null;
+  imageSpecs?: ImageSpec;
 }
 
 type ViewMode = "box" | "outline";
@@ -37,6 +52,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   complianceRules,
   complianceResults,
   isComplianceLoading,
+  imageFile,
+  imageSpecs,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -47,6 +64,15 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [viewMode, setViewMode] = useState<ViewMode>("box");
   const [activeTab, setActiveTab] = useState<TabMode>("extraction");
+  const [imageMetadata, setImageMetadata] = useState<ImageMetadata | null>(
+    null
+  );
+  const [showMetadata, setShowMetadata] = useState(false);
+
+  // Extract image metadata
+  useEffect(() => {
+    extractImageMetadata(imageFile || null, imageSrc).then(setImageMetadata);
+  }, [imageSrc, imageFile]);
 
   // Generate crops when image loads
   useEffect(() => {
@@ -152,129 +178,170 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   return (
     <div className="flex flex-col lg:flex-row h-full gap-6 overflow-hidden">
       {/* Left Panel: Image Overlay */}
-      <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[400px]">
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-          <h2 className="font-semibold text-slate-700 flex items-center gap-2">
+      <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden min-h-[400px]">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+          <h2 className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
             <ImageIcon size={18} /> Original with Outlines
           </h2>
           <div className="flex items-center gap-4">
+            <Popover
+              content={
+                imageMetadata ? (
+                  <div className="w-96 max-w-[90vw]">
+                    <ImageMetadataDisplay
+                      metadata={imageMetadata}
+                      specs={imageSpecs}
+                    />
+                  </div>
+                ) : (
+                  <div className="p-2 text-slate-500">Loading metadata...</div>
+                )
+              }
+              title={
+                <div className="flex items-center gap-2">
+                  <Info size={16} />
+                  Image Specifications
+                </div>
+              }
+              trigger="click"
+              open={showMetadata}
+              onOpenChange={setShowMetadata}
+              placement="bottomRight"
+            >
+              <button
+                className={`flex items-center gap-2 text-sm font-medium transition-colors ${
+                  showMetadata
+                    ? "text-indigo-600 dark:text-indigo-400"
+                    : "text-slate-600 dark:text-slate-400 hover:text-indigo-600"
+                }`}
+                title="Toggle Image Info"
+              >
+                <Info size={18} />
+                Specs
+              </button>
+            </Popover>
             <button
               onClick={() =>
                 setViewMode((prev) => (prev === "box" ? "outline" : "box"))
               }
-              className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
+              className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
             >
               {viewMode === "box" ? (
                 <ToggleLeft size={20} />
               ) : (
-                <ToggleRight size={20} className="text-indigo-600" />
+                <ToggleRight
+                  size={20}
+                  className="text-indigo-600 dark:text-indigo-400"
+                />
               )}
               {viewMode === "box" ? "Box View" : "Outline View"}
             </button>
             <button
               onClick={onReset}
-              className="text-sm text-red-600 hover:text-red-700 font-medium"
+              className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
             >
               Analyze Another
             </button>
           </div>
         </div>
 
-        <div
-          className="relative flex-1 bg-slate-100 overflow-auto flex items-center justify-center p-4"
-          ref={containerRef}
-        >
-          <div className="relative shadow-lg inline-block">
-            <img
-              src={imageSrc}
-              alt="Analyzed"
-              className="max-w-full max-h-[70vh] block object-contain"
-            />
-            {/* Overlay Layer */}
-            <div className="absolute inset-0 pointer-events-none">
-              <svg
-                className="absolute inset-0 w-full h-full"
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-              >
-                {elementsWithCrops.map((el) => (
-                  <g key={`svg-${el.id}`}>
-                    {viewMode === "outline" &&
-                    el.polygon &&
-                    el.polygon.length > 0 ? (
-                      <polygon
-                        points={getPolygonPoints(el.polygon)}
-                        fill={
-                          hoveredId === el.id
-                            ? getStrokeColor(el.category)
-                            : "transparent"
-                        }
-                        fillOpacity="0.2"
-                        stroke={getStrokeColor(el.category)}
-                        strokeWidth="0.5"
-                        vectorEffect="non-scaling-stroke"
-                        className="transition-all duration-200"
-                      />
-                    ) : (
-                      <rect
-                        x={el.box.xmin * 100}
-                        y={el.box.ymin * 100}
-                        width={(el.box.xmax - el.box.xmin) * 100}
-                        height={(el.box.ymax - el.box.ymin) * 100}
-                        fill={
-                          hoveredId === el.id
-                            ? getStrokeColor(el.category)
-                            : "transparent"
-                        }
-                        fillOpacity="0.2"
-                        stroke={getStrokeColor(el.category)}
-                        strokeWidth="0.5"
-                        vectorEffect="non-scaling-stroke"
-                        className="transition-all duration-200"
-                      />
-                    )}
-                  </g>
-                ))}
-              </svg>
-
-              {/* Interactive HTML Layer for tooltips/labels */}
-              {elementsWithCrops.map((el) => (
-                <div
-                  key={el.id}
-                  className="absolute"
-                  style={{
-                    top: `${el.box.ymin * 100}%`,
-                    left: `${el.box.xmin * 100}%`,
-                    width: `${(el.box.xmax - el.box.xmin) * 100}%`,
-                    height: `${(el.box.ymax - el.box.ymin) * 100}%`,
-                  }}
+        <ZoomPanControls className="relative flex-1 bg-slate-100 dark:bg-slate-900 overflow-hidden">
+          <div
+            className="relative flex items-center justify-center p-4 w-full h-full"
+            ref={containerRef}
+          >
+            <div className="relative shadow-lg inline-block">
+              <img
+                src={imageSrc}
+                alt="Analyzed"
+                className="max-w-full max-h-[60vh] block object-contain"
+              />
+              {/* Overlay Layer */}
+              <div className="absolute inset-0 pointer-events-none">
+                <svg
+                  className="absolute inset-0 w-full h-full"
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
                 >
-                  {/* Label tag on hover */}
-                  {hoveredId === el.id && (
-                    <div
-                      className="absolute -top-6 left-0 px-2 py-0.5 text-xs text-white font-bold rounded shadow-sm whitespace-nowrap z-20"
-                      style={{ backgroundColor: getStrokeColor(el.category) }}
-                    >
-                      {el.category}
-                    </div>
-                  )}
-                </div>
-              ))}
+                  {elementsWithCrops.map((el) => (
+                    <g key={`svg-${el.id}`}>
+                      {viewMode === "outline" &&
+                      el.polygon &&
+                      el.polygon.length > 0 ? (
+                        <polygon
+                          points={getPolygonPoints(el.polygon)}
+                          fill={
+                            hoveredId === el.id
+                              ? getStrokeColor(el.category)
+                              : "transparent"
+                          }
+                          fillOpacity="0.2"
+                          stroke={getStrokeColor(el.category)}
+                          strokeWidth="0.5"
+                          vectorEffect="non-scaling-stroke"
+                          className="transition-all duration-200"
+                        />
+                      ) : (
+                        <rect
+                          x={el.box.xmin * 100}
+                          y={el.box.ymin * 100}
+                          width={(el.box.xmax - el.box.xmin) * 100}
+                          height={(el.box.ymax - el.box.ymin) * 100}
+                          fill={
+                            hoveredId === el.id
+                              ? getStrokeColor(el.category)
+                              : "transparent"
+                          }
+                          fillOpacity="0.2"
+                          stroke={getStrokeColor(el.category)}
+                          strokeWidth="0.5"
+                          vectorEffect="non-scaling-stroke"
+                          className="transition-all duration-200"
+                        />
+                      )}
+                    </g>
+                  ))}
+                </svg>
+
+                {/* Interactive HTML Layer for tooltips/labels */}
+                {elementsWithCrops.map((el) => (
+                  <div
+                    key={el.id}
+                    className="absolute"
+                    style={{
+                      top: `${el.box.ymin * 100}%`,
+                      left: `${el.box.xmin * 100}%`,
+                      width: `${(el.box.xmax - el.box.xmin) * 100}%`,
+                      height: `${(el.box.ymax - el.box.ymin) * 100}%`,
+                    }}
+                  >
+                    {/* Label tag on hover */}
+                    {hoveredId === el.id && (
+                      <div
+                        className="absolute -top-6 left-0 px-2 py-0.5 text-xs text-white font-bold rounded shadow-sm whitespace-nowrap z-20"
+                        style={{ backgroundColor: getStrokeColor(el.category) }}
+                      >
+                        {el.category}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        </ZoomPanControls>
       </div>
 
       {/* Right Panel: Tabs and Content */}
-      <div className="w-full lg:w-[420px] flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-full max-h-[80vh] lg:max-h-full">
+      <div className="w-full lg:w-[420px] flex flex-col bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden h-full max-h-[80vh] lg:max-h-full">
         {/* Tabs */}
-        <div className="flex border-b border-slate-200 bg-slate-50">
+        <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
           <button
             onClick={() => setActiveTab("extraction")}
             className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
               activeTab === "extraction"
-                ? "border-indigo-600 text-indigo-700 bg-white"
-                : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                ? "border-indigo-600 text-indigo-700 dark:text-indigo-400 bg-white dark:bg-slate-800"
+                : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
             }`}
           >
             <LayoutList size={16} /> Extraction
@@ -283,8 +350,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             onClick={() => setActiveTab("compliance")}
             className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${
               activeTab === "compliance"
-                ? "border-indigo-600 text-indigo-700 bg-white"
-                : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                ? "border-indigo-600 text-indigo-700 dark:text-indigo-400 bg-white dark:bg-slate-800"
+                : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
             }`}
           >
             <ShieldCheck size={16} /> Compliance
@@ -297,11 +364,13 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             activeTab === "extraction" ? "flex" : "hidden"
           }`}
         >
-          <div className="p-4 border-b border-slate-100 bg-white/50">
+          <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold text-slate-700">Detailed Results</h2>
+              <h2 className="font-semibold text-slate-700 dark:text-slate-200">
+                Detailed Results
+              </h2>
               {platformName && (
-                <span className="text-xs font-medium px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md border border-indigo-100">
+                <span className="text-xs font-medium px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-md border border-indigo-100 dark:border-indigo-800">
                   {platformName}
                 </span>
               )}
@@ -314,8 +383,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                   onClick={() => setSelectedCategory(cat)}
                   className={`px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
                     selectedCategory === cat
-                      ? "bg-slate-800 text-white"
-                      : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-100"
+                      ? "bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800"
+                      : "bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600"
                   }`}
                 >
                   {cat}
@@ -324,21 +393,21 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 dark:bg-slate-900/50">
             {filteredElements.map((el) => (
               <div
                 key={el.id}
                 onMouseEnter={() => setHoveredId(el.id)}
                 onMouseLeave={() => setHoveredId(null)}
-                className={`bg-white rounded-xl p-3 border transition-all duration-200 cursor-pointer ${
+                className={`bg-white dark:bg-slate-800 rounded-xl p-3 border transition-all duration-200 cursor-pointer ${
                   hoveredId === el.id
-                    ? "border-blue-400 shadow-md ring-1 ring-blue-100"
-                    : "border-slate-200 hover:border-slate-300 shadow-sm"
+                    ? "border-blue-400 dark:border-blue-500 shadow-md ring-1 ring-blue-100 dark:ring-blue-900"
+                    : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 shadow-sm"
                 }`}
               >
                 <div className="flex gap-3">
                   {/* Cropped Thumbnail */}
-                  <div className="w-20 h-20 flex-shrink-0 bg-slate-100 rounded-lg overflow-hidden border border-slate-100 flex items-center justify-center">
+                  <div className="w-20 h-20 flex-shrink-0 bg-slate-100 dark:bg-slate-700 rounded-lg overflow-hidden border border-slate-100 dark:border-slate-600 flex items-center justify-center">
                     {el.croppedImageUrl ? (
                       <img
                         src={el.croppedImageUrl}
@@ -346,7 +415,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                         className="w-full h-full object-contain"
                       />
                     ) : (
-                      <div className="animate-pulse bg-slate-200 w-full h-full" />
+                      <div className="animate-pulse bg-slate-200 dark:bg-slate-600 w-full h-full" />
                     )}
                   </div>
 
@@ -362,7 +431,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                         {el.category}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-700 line-clamp-3 font-medium leading-relaxed">
+                    <p className="text-sm text-slate-700 dark:text-slate-200 line-clamp-3 font-medium leading-relaxed">
                       {el.content}
                     </p>
                     <div className="mt-2 flex gap-2">
@@ -371,7 +440,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                           e.stopPropagation();
                           navigator.clipboard.writeText(el.content);
                         }}
-                        className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
+                        className="text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1"
                       >
                         <Download size={12} /> Copy Text
                       </button>
@@ -382,12 +451,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             ))}
 
             {filteredElements.length === 0 && (
-              <div className="text-center py-12 text-slate-400">
+              <div className="text-center py-12 text-slate-400 dark:text-slate-500">
                 <p>No elements found in this category.</p>
               </div>
             )}
           </div>
-          <div className="p-3 border-t border-slate-100 bg-slate-50 text-center text-xs text-slate-400">
+          <div className="p-3 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-center text-xs text-slate-400 dark:text-slate-500">
             {elementsWithCrops.length} elements detected
           </div>
         </div>
@@ -403,6 +472,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             rules={complianceRules || []}
             initialResults={complianceResults}
             isComplianceLoading={isComplianceLoading}
+            imageFile={imageFile}
+            imageSpecs={imageSpecs}
           />
         </div>
       </div>

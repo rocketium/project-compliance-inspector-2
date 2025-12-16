@@ -1,6 +1,41 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Override colors for grayscale dark mode */
+@theme {
+  /* Slate → Neutral grays (removes blue tint) */
+  --color-slate-50: #fafafa;
+  --color-slate-100: #f5f5f5;
+  --color-slate-200: #e5e5e5;
+  --color-slate-300: #d4d4d4;
+  --color-slate-400: #a3a3a3;
+  --color-slate-500: #737373;
+  --color-slate-600: #525252;
+  --color-slate-700: #404040;
+  --color-slate-800: #262626;
+  --color-slate-900: #171717;
+  --color-slate-950: #0a0a0a;
+}
+
+/* Grayscale overrides for accent colors in dark mode */
+.dark .bg-indigo-600 { background-color: #525252 !important; }
+.dark .bg-indigo-700 { background-color: #404040 !important; }
+.dark .hover\:bg-indigo-700:hover { background-color: #404040 !important; }
+.dark .bg-indigo-50 { background-color: #262626 !important; }
+.dark .text-indigo-600 { color: #a3a3a3 !important; }
+.dark .text-indigo-700 { color: #d4d4d4 !important; }
+.dark .text-indigo-400 { color: #a3a3a3 !important; }
+.dark .text-indigo-300 { color: #d4d4d4 !important; }
+.dark .border-indigo-600 { border-color: #525252 !important; }
+.dark .ring-indigo-600 { --tw-ring-color: #525252 !important; }
+.dark .shadow-indigo-200 { --tw-shadow-color: rgba(38, 38, 38, 0.3) !important; }
+.dark .shadow-indigo-900\/30 { --tw-shadow-color: rgba(10, 10, 10, 0.3) !important; }
+.dark .bg-indigo-900\/30 { background-color: rgba(38, 38, 38, 0.3) !important; }
+.dark .dark\:bg-indigo-900\/30 { background-color: rgba(38, 38, 38, 0.3) !important; }
+.dark .dark\:text-indigo-400 { color: #a3a3a3 !important; }
+.dark .dark\:text-indigo-300 { color: #d4d4d4 !important; }
+.dark .hover\:text-indigo-800:hover { color: #e5e5e5 !important; }
+.dark .dark\:hover\:text-indigo-300:hover { color: #d4d4d4 !important; }
+.dark .focus\:ring-indigo-500:focus { --tw-ring-color: #737373 !important; }
 
 @layer base {
   :root {
@@ -27,25 +62,26 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    /* Grayscale dark mode - all saturation set to 0 */
+    --background: 0 0% 7%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 0 0% 85%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 0 0% 18%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 50% 40%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 0 0% 70%;
   }
 }
 
@@ -69,20 +105,20 @@
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - grayscale dark mode */
 .dark ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 .dark ::-webkit-scrollbar-track {
-  background: hsl(var(--background));
+  background: #121212;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted));
+  background: #2a2a2a;
   border-radius: 4px;
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
+  background: #404040;
 }
 
 ::-webkit-scrollbar {

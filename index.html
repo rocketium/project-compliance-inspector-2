@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AdAnalyzer AI</title>
+    <title>Rocketium AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -12,6 +12,36 @@
           extend: {
             fontFamily: {
               sans: ['Inter', 'system-ui', 'sans-serif'],
+            },
+            colors: {
+              // Override slate with neutral grays for grayscale dark mode
+              slate: {
+                50: '#fafafa',
+                100: '#f5f5f5',
+                200: '#e5e5e5',
+                300: '#d4d4d4',
+                400: '#a3a3a3',
+                500: '#737373',
+                600: '#525252',
+                700: '#404040',
+                800: '#262626',
+                900: '#171717',
+                950: '#0a0a0a',
+              },
+              // Keep neutral colors same (already grayscale)
+              neutral: {
+                50: '#fafafa',
+                100: '#f5f5f5',
+                200: '#e5e5e5',
+                300: '#d4d4d4',
+                400: '#a3a3a3',
+                500: '#737373',
+                600: '#525252',
+                700: '#404040',
+                800: '#262626',
+                900: '#171717',
+                950: '#0a0a0a',
+              },
             },
           },
         },
@@ -26,43 +56,56 @@
       html {
         transition: background-color 0.3s ease, color 0.3s ease;
       }
-      /* Custom scrollbar for dark mode */
+      /* Custom scrollbar for dark mode - grayscale */
       .dark ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
       }
       .dark ::-webkit-scrollbar-track {
-        background: #1e293b;
+        background: #121212;
       }
       .dark ::-webkit-scrollbar-thumb {
-        background: #475569;
+        background: #2a2a2a;
         border-radius: 4px;
       }
       .dark ::-webkit-scrollbar-thumb:hover {
-        background: #64748b;
+        background: #404040;
       }
-      /* Ant Design Popover Dark Mode Customization */
+      /* Ant Design Popover Dark Mode Customization - grayscale */
       .dark .ant-popover {
         color-scheme: dark;
       }
       .dark .ant-popover-inner {
-        background-color: #1e293b;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+        background-color: #171717;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
       }
       .dark .ant-popover-title {
-        color: #f1f5f9;
-        border-bottom-color: #475569;
+        color: #f0f0f0;
+        border-bottom-color: #2a2a2a;
       }
       .dark .ant-popover-inner-content {
-        color: #e2e8f0;
+        color: #d4d4d4;
       }
       .dark .ant-popover-arrow::before,
       .dark .ant-popover-arrow::after {
-        background: #1e293b;
+        background: #171717;
       }
+      
+      /* Grayscale overrides for indigo accent in dark mode */
+      .dark .bg-indigo-600 { background-color: #525252 !important; }
+      .dark .bg-indigo-700 { background-color: #404040 !important; }
+      .dark .hover\:bg-indigo-700:hover { background-color: #404040 !important; }
+      .dark .bg-indigo-50 { background-color: #262626 !important; }
+      .dark .text-indigo-600 { color: #a3a3a3 !important; }
+      .dark .text-indigo-700 { color: #d4d4d4 !important; }
+      .dark .text-indigo-400 { color: #a3a3a3 !important; }
+      .dark .text-indigo-300 { color: #d4d4d4 !important; }
+      .dark .border-indigo-500 { border-color: #737373 !important; }
+      .dark .hover\:border-indigo-500:hover { border-color: #737373 !important; }
+      .dark .hover\:border-indigo-400:hover { border-color: #a3a3a3 !important; }
     </style>
 </head>
-  <body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 antialiased transition-colors">
+  <body class="bg-slate-50 dark:bg-neutral-950 text-slate-900 dark:text-neutral-100 antialiased transition-colors">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

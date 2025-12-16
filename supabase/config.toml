@@ -1,0 +1,14 @@
+# Supabase configuration for Edge Functions
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[functions.create-evaluation]
+verify_jwt = false
+
+[functions.get-evaluation]
+verify_jwt = false

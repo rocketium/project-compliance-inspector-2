@@ -77,7 +77,7 @@ export const Login: React.FC = () => {
             <Sparkles className="text-white h-8 w-8" />
           </div>
           <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">
-            AdAnalyzer AI
+            Rocketium AI
           </h1>
           <p className="text-slate-600 dark:text-slate-400">
             {mode === "signin"

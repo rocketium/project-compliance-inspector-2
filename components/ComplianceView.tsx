@@ -45,6 +45,7 @@ interface ComplianceViewProps {
   imageFile?: File | null;
   imageSpecs?: ImageSpec;
   extractionResults?: AnalysisResult;
+  latestImageVersion?: string;
   onImageFixGenerated?: (
     imageDataUrl: string,
     ruleIndex: number,
@@ -116,7 +117,7 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
         imageSrc.indexOf(";")
       );
 
-      const data = await checkComplianceWithGemini(base64Data, mimeType, rules);
+      const data = await checkComplianceWithGemini(base64Data, mimeType, rules, "seed-dream");
       setResults(data);
       setScores(calculateComplianceScores(data));
       setHasRun(true);

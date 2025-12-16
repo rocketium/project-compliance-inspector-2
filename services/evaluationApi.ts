@@ -175,11 +175,6 @@ export const createEvaluationJob = async (
 
     // Fetch project data first
     const baseUrl = getApiBaseUrl();
-    const isLocalhost =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1");
-
     const response = await fetch(
       `${baseUrl}/api/v2/assetGroup/${projectId}/variations`,
       {
@@ -187,9 +182,6 @@ export const createEvaluationJob = async (
         headers: {
           accept: "application/json, text/plain, */*",
         },
-        ...(isLocalhost
-          ? {}
-          : { credentials: "include" as RequestCredentials }),
       }
     );
 

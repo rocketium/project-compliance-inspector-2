@@ -227,10 +227,6 @@ export const EvaluateProject: React.FC = () => {
 
       try {
         const baseUrl = getApiBaseUrl();
-        const isLocalhost =
-          window.location.hostname === "localhost" ||
-          window.location.hostname === "127.0.0.1";
-
         const response = await fetch(
           `${baseUrl}/api/v2/assetGroup/${projectId}/variations`,
           {
@@ -238,9 +234,6 @@ export const EvaluateProject: React.FC = () => {
             headers: {
               accept: "application/json, text/plain, */*",
             },
-            ...(isLocalhost
-              ? {}
-              : { credentials: "include" as RequestCredentials }),
           }
         );
 

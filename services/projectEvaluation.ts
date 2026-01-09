@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import { AnalysisResult, ComplianceResult, ComplianceScores } from "../types";
+import { AnalysisResult, ComplianceResult, ComplianceScores, AttentionInsightResult } from "../types";
 
 // Types for stored evaluation data
 export interface StoredCreativeResult {
@@ -14,6 +14,7 @@ export interface StoredCreativeResult {
   analysisResult?: AnalysisResult;
   complianceResults?: ComplianceResult[];
   complianceScores?: ComplianceScores;
+  attentionResult?: AttentionInsightResult;
   analyzedAt?: string;
   platformId?: string;
 }

@@ -13,6 +13,7 @@ import {
   AnalysisResult,
   ComplianceResult,
   ComplianceScores,
+  AttentionInsightResult,
 } from "../types";
 import { DEFAULT_PLATFORMS } from "../constants/platforms";
 
@@ -44,6 +45,7 @@ export interface EvaluationCreative {
   analysisResult?: AnalysisResult;
   complianceResults?: ComplianceResult[];
   complianceScores?: ComplianceScores;
+  attentionResult?: AttentionInsightResult;
   error?: string;
 }
 
@@ -541,4 +543,55 @@ export const subscribeToJobUpdates = (
   return () => {
     supabase.removeChannel(channel);
   };
+};
+
+/**
+ * Update a creative's attention result in an evaluation job
+ */
+export const updateJobCreativeAttention = async (
+  jobId: string,
+  creativeId: string,
+  attentionResult: AttentionInsightResult
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // First, load the current job
+    const { data: jobData, error: loadError } = await supabase
+      .from("evaluation_jobs")
+      .select("creatives")
+      .eq("id", jobId)
+      .single();
+
+    if (loadError) {
+      throw loadError;
+    }
+
+    // Parse creatives
+    const creatives: EvaluationCreative[] =
+      typeof jobData.creatives === "string"
+        ? JSON.parse(jobData.creatives || "[]")
+        : jobData.creatives || [];
+
+    // Update the specific creative's attention result
+    const updatedCreatives = creatives.map((c) =>
+      c.id === creativeId ? { ...c, attentionResult } : c
+    );
+
+    // Save back to database
+    const { error: updateError } = await supabase
+      .from("evaluation_jobs")
+      .update({
+        creatives: JSON.stringify(updatedCreatives),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", jobId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating creative attention result:", error);
+    return { success: false, error: error.message };
+  }
 };

@@ -94,3 +94,43 @@ export enum AppState {
 }
 
 export type ThemeMode = "light" | "dark";
+
+// Attention Insight types
+export interface AttentionAreaRecommendation {
+  name: string;
+  description: string;
+  colorIndicator: "red" | "yellow" | "green";
+}
+
+export interface AttentionArea {
+  x: number; // percentage 0-100
+  y: number; // percentage 0-100
+  width: number; // percentage
+  height: number; // percentage
+  score: number; // AOI attention percentage
+  label?: string;
+  recommendation?: AttentionAreaRecommendation;
+}
+
+export interface AttentionMetrics {
+  topThird: number;
+  middleThird: number;
+  bottomThird: number;
+  leftHalf: number;
+  rightHalf: number;
+}
+
+export interface AttentionInsightResult {
+  studyId: string;
+  heatmapUrl: string;
+  clarityScore: number; // 0-100
+  clarityDescription: string;
+  clarityKey: string;
+  focusScore: number; // 0-100
+  benchmarkDescription: string;
+  benchmarkPercentile: number;
+  attentionAreas: AttentionArea[];
+  metrics: AttentionMetrics;
+  suggestions: string[];
+  status: "pending" | "processing" | "completed" | "failed";
+}

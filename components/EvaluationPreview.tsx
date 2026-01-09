@@ -771,7 +771,7 @@ export const EvaluationPreview: React.FC = () => {
                       onClick={() => {
                         setShowHeatmap(!showHeatmap);
                         if (!showHeatmap) {
-                          setHeatmapSliderPosition(50);
+                          setHeatmapSliderPosition(5);
                         }
                       }}
                       className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-lg font-medium transition-all duration-200 ${

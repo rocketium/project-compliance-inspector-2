@@ -547,6 +547,7 @@ export const subscribeToJobUpdates = (
 
 /**
  * Update a creative's attention result in an evaluation job
+ * Uses Edge Function to bypass CORS restrictions
  */
 export const updateJobCreativeAttention = async (
   jobId: string,
@@ -554,39 +555,38 @@ export const updateJobCreativeAttention = async (
   attentionResult: AttentionInsightResult
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    // First, load the current job
-    const { data: jobData, error: loadError } = await supabase
-      .from("evaluation_jobs")
-      .select("creatives")
-      .eq("id", jobId)
-      .single();
+    // Get Supabase URL from environment (using type assertion for Vite)
+    const env = (import.meta as any).env;
+    const supabaseUrl = env?.VITE_SUPABASE_URL;
+    const supabaseAnonKey = env?.VITE_SUPABASE_ANON_KEY;
 
-    if (loadError) {
-      throw loadError;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error("Missing Supabase environment variables");
     }
 
-    // Parse creatives
-    const creatives: EvaluationCreative[] =
-      typeof jobData.creatives === "string"
-        ? JSON.parse(jobData.creatives || "[]")
-        : jobData.creatives || [];
-
-    // Update the specific creative's attention result
-    const updatedCreatives = creatives.map((c) =>
-      c.id === creativeId ? { ...c, attentionResult } : c
+    // Call the Edge Function
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/update-attention`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          job_id: jobId,
+          creative_id: creativeId,
+          attention_result: attentionResult,
+        }),
+      }
     );
 
-    // Save back to database
-    const { error: updateError } = await supabase
-      .from("evaluation_jobs")
-      .update({
-        creatives: JSON.stringify(updatedCreatives),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", jobId);
+    const data = await response.json();
 
-    if (updateError) {
-      throw updateError;
+    if (!response.ok || !data.success) {
+      throw new Error(
+        data.error || `Request failed with status ${response.status}`
+      );
     }
 
     return { success: true };

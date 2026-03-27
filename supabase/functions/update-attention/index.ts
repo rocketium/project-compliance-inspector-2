@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { saveProjectEvaluationSnapshot } from "../_shared/projectEvaluation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,7 +50,7 @@ serve(async (req) => {
     // Load current job
     const { data: jobData, error: loadError } = await supabase
       .from("evaluation_jobs")
-      .select("creatives")
+      .select("project_id, project_name, platform_id, metadata, creatives")
       .eq("id", job_id)
       .single();
 
@@ -73,6 +74,10 @@ serve(async (req) => {
       typeof jobData.creatives === "string"
         ? JSON.parse(jobData.creatives || "[]")
         : jobData.creatives || [];
+    const metadata =
+      typeof jobData.metadata === "string"
+        ? JSON.parse(jobData.metadata || "{}")
+        : jobData.metadata || {};
 
     const updatedCreatives = creatives.map((c: any) =>
       c.id === creative_id ? { ...c, attentionResult: attention_result } : c
@@ -100,6 +105,16 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    if ((metadata.sourceType || "single") === "single") {
+      await saveProjectEvaluationSnapshot({
+        supabase,
+        projectId: jobData.project_id,
+        projectName: jobData.project_name,
+        platformId: jobData.platform_id,
+        creatives: updatedCreatives,
+      });
     }
 
     console.log(

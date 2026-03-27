@@ -495,7 +495,9 @@ const runBackgroundAnalysis = async ({
       const storedCreatives: StoredCreativeResult[] = results
         .filter((creative) => creative.complianceResults || creative.analysisResult)
         .map((creative) => ({
-          creativeId: creative.id,
+          creativeId: creative.variationId
+            ? `${creative.variationId}-${creative.dimensionKey}`
+            : creative.id,
           creativeUrl: creative.url,
           creativeName: creative.name,
           dimensionKey: creative.dimensionKey,

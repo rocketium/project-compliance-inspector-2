@@ -14,6 +14,7 @@ import {
 import { loadCapsuleDocument } from "../_shared/mongoCapsules.ts";
 import { DEFAULT_PLATFORMS } from "../_shared/platforms.ts";
 import { PromptLayerConfig } from "../_shared/promptLayers.ts";
+import { saveProjectEvaluationSnapshot } from "../_shared/projectEvaluation.ts";
 import { parseRocketiumSource } from "../_shared/source.ts";
 import {
   buildCapsuleSnapshot,
@@ -268,6 +269,10 @@ const analyzeCreative = async ({
 const runBackgroundAnalysis = async ({
   supabase,
   jobId,
+  projectId,
+  projectName,
+  platformId,
+  shouldPersistProjectEvaluation,
   creatives,
   platformPrompt,
   rules,
@@ -275,6 +280,10 @@ const runBackgroundAnalysis = async ({
 }: {
   supabase: any;
   jobId: string;
+  projectId: string;
+  projectName?: string;
+  platformId: string;
+  shouldPersistProjectEvaluation: boolean;
   creatives: EvaluationCreative[];
   platformPrompt: string;
   rules: string[] | ComplianceRuleDefinition[];
@@ -340,6 +349,16 @@ const runBackgroundAnalysis = async ({
         updated_at: new Date().toISOString(),
       })
       .eq("id", jobId);
+
+    if (shouldPersistProjectEvaluation) {
+      await saveProjectEvaluationSnapshot({
+        supabase,
+        projectId,
+        projectName,
+        platformId,
+        creatives: results,
+      });
+    }
   } catch (error: any) {
     console.error("Background analysis failed:", error);
     await supabase
@@ -505,6 +524,10 @@ serve(async (req) => {
       runBackgroundAnalysis({
         supabase,
         jobId,
+        projectId: source.projectIds[0],
+        projectName,
+        platformId: platform_id,
+        shouldPersistProjectEvaluation: source.sourceType === "single",
         creatives,
         platformPrompt: promptToUse,
         rules: compiledRules,

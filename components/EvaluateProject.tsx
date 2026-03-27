@@ -102,6 +102,15 @@ interface Creative {
   error?: string;
 }
 
+const matchesSavedCreative = (
+  creative: Creative,
+  savedCreative: StoredCreativeResult
+): boolean =>
+  savedCreative.creativeId === creative.id ||
+  (savedCreative.variationId === creative.variationId &&
+    savedCreative.dimensionKey === creative.dimensionKey) ||
+  savedCreative.creativeUrl === creative.url;
+
 // Get the API base URL based on current environment
 const getApiBaseUrl = () => {
   const env = (import.meta as any).env;
@@ -286,7 +295,7 @@ export const EvaluateProject: React.FC = () => {
 
           extractedCreatives = extractedCreatives.map((creative) => {
             const savedCreative = savedResult.data!.creatives.find(
-              (sc) => sc.creativeId === creative.id
+              (sc) => matchesSavedCreative(creative, sc)
             );
             if (savedCreative) {
               return {

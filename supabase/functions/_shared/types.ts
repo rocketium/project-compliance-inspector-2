@@ -30,6 +30,7 @@ export interface EvaluationCreative {
   analysisResult?: AnalysisResult;
   complianceResults?: ComplianceResult[];
   complianceScores?: ComplianceScores;
+  attentionResult?: AttentionInsightResult;
   error?: string;
 }
 
@@ -178,6 +179,45 @@ export interface ComplianceScores {
     warnings: number;
     total: number;
   };
+}
+
+export interface AttentionAreaRecommendation {
+  name: string;
+  description: string;
+  colorIndicator: "red" | "yellow" | "green";
+}
+
+export interface AttentionArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  score: number;
+  label?: string;
+  recommendation?: AttentionAreaRecommendation;
+}
+
+export interface AttentionMetrics {
+  topThird: number;
+  middleThird: number;
+  bottomThird: number;
+  leftHalf: number;
+  rightHalf: number;
+}
+
+export interface AttentionInsightResult {
+  studyId: string;
+  heatmapUrl: string;
+  clarityScore: number;
+  clarityDescription: string;
+  clarityKey: string;
+  focusScore: number;
+  benchmarkDescription: string;
+  benchmarkPercentile: number;
+  attentionAreas: AttentionArea[];
+  metrics: AttentionMetrics;
+  suggestions: string[];
+  status: "pending" | "processing" | "completed" | "failed";
 }
 
 export interface PlatformConfig {

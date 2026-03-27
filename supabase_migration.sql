@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS evaluation_jobs (
   total_creatives INTEGER NOT NULL DEFAULT 0,
   analyzed_creatives INTEGER NOT NULL DEFAULT 0,
   creatives JSONB NOT NULL DEFAULT '[]',
+  metadata JSONB NOT NULL DEFAULT '{}',
   error TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -58,3 +59,35 @@ CREATE POLICY "Allow all operations on evaluation_jobs" ON evaluation_jobs
 -- Enable realtime for this table (required for live updates)
 ALTER PUBLICATION supabase_realtime ADD TABLE evaluation_jobs;
 
+-- Migration: add metadata column for newer combined-source jobs
+ALTER TABLE evaluation_jobs
+  ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}';
+
+-- ===============================================
+-- Config tables for platform + brand rules
+-- ===============================================
+
+CREATE TABLE IF NOT EXISTS platform_configs (
+  id TEXT PRIMARY KEY,
+  data JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS brand_configs (
+  id TEXT PRIMARY KEY,
+  data JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE platform_configs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE brand_configs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow all operations on platform_configs" ON platform_configs;
+CREATE POLICY "Allow all operations on platform_configs" ON platform_configs
+  FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all operations on brand_configs" ON brand_configs;
+CREATE POLICY "Allow all operations on brand_configs" ON brand_configs
+  FOR ALL USING (true) WITH CHECK (true);

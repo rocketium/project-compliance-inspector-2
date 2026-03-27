@@ -8,6 +8,18 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const parseMetadata = (value: unknown) => {
+  if (!value) return {};
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  return typeof value === "object" ? value : {};
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -59,6 +71,7 @@ serve(async (req) => {
       typeof data.creatives === "string"
         ? JSON.parse(data.creatives || "[]")
         : data.creatives || [];
+    const metadata = parseMetadata(data.metadata);
 
     // Calculate summary stats
     const completedCreatives = creatives.filter((c) => c.status === "completed");
@@ -94,6 +107,13 @@ serve(async (req) => {
           total_creatives: data.total_creatives,
           analyzed_creatives: data.analyzed_creatives,
           creatives: creatives,
+          metadata,
+          source_type: metadata.sourceType || "single",
+          source_project_ids: metadata.sourceProjectIds || [data.project_id],
+          workspace_short_id: metadata.workspaceShortId,
+          brand_id: metadata.brandId,
+          brand_name: metadata.brandName,
+          rule_mode: metadata.ruleMode,
           created_at: data.created_at,
           updated_at: data.updated_at,
           error: data.error,

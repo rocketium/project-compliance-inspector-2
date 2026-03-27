@@ -28,6 +28,7 @@ import {
   generateMockAttentionResult,
   isAttentionInsightConfigured,
 } from "../services/attentionInsight";
+import { buildPromptLayerConfig } from "../lib/ruleBundle";
 import {
   ArrowLeft,
   Sparkles,
@@ -62,6 +63,8 @@ import { useTheme } from "../contexts/ThemeContext";
 import { Spinner } from "./Spinner";
 import { ZoomPanControls } from "./ZoomPanControls";
 import { DEFAULT_PLATFORMS } from "../constants/platforms";
+import { getFetchableAssetUrl } from "../lib/assetProxy";
+import { loadPlatforms } from "../services/configService";
 
 // Types for Rocketium API response
 interface RocketiumVariation {
@@ -101,11 +104,11 @@ interface Creative {
 
 // Get the API base URL based on current environment
 const getApiBaseUrl = () => {
-  const hostname = window.location.hostname;
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "http://localhost:3000";
-  }
-  return "https://rocketium.com";
+  const env = (import.meta as any).env;
+  return (
+    env?.VITE_ROCKETIUM_API_BASE_URL?.replace(/\/$/, "") ||
+    "https://rocketium.com"
+  );
 };
 
 // Theme toggle button with refined styling
@@ -183,17 +186,8 @@ export const EvaluateProject: React.FC = () => {
   useEffect(() => {
     const fetchPlatforms = async () => {
       try {
-        const res = await fetch("/api/platforms");
-        if (res.ok) {
-          const data = await res.json();
-          setPlatforms(data);
-        } else {
-          const staticRes = await fetch("/platforms.json");
-          if (staticRes.ok) {
-            const staticData = await staticRes.json();
-            setPlatforms(staticData);
-          }
-        }
+        const data = await loadPlatforms();
+        setPlatforms(data);
       } catch {
         // Keep default platforms
       }
@@ -417,7 +411,7 @@ export const EvaluateProject: React.FC = () => {
       );
 
       try {
-        const imageResponse = await fetch(creative.url);
+        const imageResponse = await fetch(getFetchableAssetUrl(creative.url));
         const blob = await imageResponse.blob();
         const reader = new FileReader();
 
@@ -436,7 +430,8 @@ export const EvaluateProject: React.FC = () => {
         const analysisResult = await analyzeImageWithGemini(
           base64Data,
           mimeType,
-          activePlatform.prompt
+          activePlatform.prompt,
+          buildPromptLayerConfig({ platform: activePlatform })
         );
 
         setCreatives((prev) =>
@@ -459,7 +454,9 @@ export const EvaluateProject: React.FC = () => {
           complianceResults = await checkComplianceWithGemini(
             base64Data,
             mimeType,
-            activePlatform.complianceRules || []
+            activePlatform.complianceRules || [],
+            buildPromptLayerConfig({ platform: activePlatform }),
+            analysisResult
           );
           complianceScores = calculateComplianceScores(complianceResults);
 
@@ -2156,4 +2153,3 @@ export const EvaluateProject: React.FC = () => {
 };
 
 export default EvaluateProject;
-

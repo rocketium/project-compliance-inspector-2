@@ -1,6 +1,17 @@
-import { AnalysisResult, ComplianceResult, ComplianceScores } from "./types.ts";
+import {
+  AnalysisResult,
+  ComplianceResult,
+  ComplianceRuleDefinition,
+  ComplianceScores,
+} from "./types.ts";
+import {
+  buildAnalysisPrompt,
+  buildCompliancePrompt,
+  PromptLayerConfig,
+} from "./promptLayers.ts";
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+const GEMINI_ANALYSIS_MODEL = "gemini-3.1-pro-preview";
 
 /**
  * Analyzes an image to extract text and visual elements with bounding boxes.
@@ -8,7 +19,8 @@ const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 export const analyzeImageWithGemini = async (
   base64Image: string,
   mimeType: string,
-  customPrompt?: string
+  customPrompt?: string,
+  promptLayers?: PromptLayerConfig | string
 ): Promise<AnalysisResult> => {
   console.log(`[Gemini] analyzeImageWithGemini called`);
   console.log(`[Gemini] API Key present: ${!!GEMINI_API_KEY}`);
@@ -37,8 +49,11 @@ export const analyzeImageWithGemini = async (
     Be very precise with the bounding boxes.
   `;
 
-  const prompt = customPrompt || defaultPrompt;
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const prompt = buildAnalysisPrompt({
+    taskPrompt: customPrompt || defaultPrompt,
+    config: promptLayers,
+  });
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_ANALYSIS_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
   console.log(`[Gemini] Making API request to Gemini...`);
 
@@ -86,6 +101,17 @@ export const analyzeImageWithGemini = async (
                     xmin: { type: "NUMBER" },
                     ymax: { type: "NUMBER" },
                     xmax: { type: "NUMBER" },
+                    polygon: {
+                      type: "ARRAY",
+                      items: {
+                        type: "OBJECT",
+                        properties: {
+                          x: { type: "NUMBER" },
+                          y: { type: "NUMBER" },
+                        },
+                        required: ["x", "y"],
+                      },
+                    },
                   },
                   required: [
                     "content",
@@ -137,7 +163,7 @@ export const analyzeImageWithGemini = async (
 
     // Normalize coordinates from 0-1000 to 0-1
     const elements = parsedData.elements.map((el: any, index: number) => ({
-      id: `el-${index}-${Date.now()}`,
+      id: `el-${index + 1}`,
       content: el.content,
       category: el.category,
       box: {
@@ -146,6 +172,12 @@ export const analyzeImageWithGemini = async (
         ymax: el.ymax / 1000,
         xmax: el.xmax / 1000,
       },
+      polygon: Array.isArray(el.polygon)
+        ? el.polygon.map((point: any) => ({
+            x: point.x / 1000,
+            y: point.y / 1000,
+          }))
+        : undefined,
     }));
 
     console.log(`[Gemini] ✅ Analysis complete. Elements: ${elements.length}`);
@@ -163,7 +195,9 @@ export const analyzeImageWithGemini = async (
 export const checkComplianceWithGemini = async (
   base64Image: string,
   mimeType: string,
-  rules: string[]
+  rules: string[] | ComplianceRuleDefinition[],
+  promptLayers?: PromptLayerConfig | string,
+  analysisResult?: AnalysisResult
 ): Promise<ComplianceResult[]> => {
   console.log(`[Gemini] checkComplianceWithGemini called`);
   console.log(`[Gemini] Rules count: ${rules.length}`);
@@ -173,22 +207,44 @@ export const checkComplianceWithGemini = async (
     throw new Error("GEMINI_API_KEY environment variable is not set");
   }
 
-  const prompt = `
-    You are a Strict Brand Compliance Officer. 
-    Evaluate the provided advertisement image against the following rules.
-    
-    For each rule:
-    1. Determine if the image passes, fails, or has a warning.
-    2. Provide specific reasoning for your decision.
-    3. If FAIL or WARNING, provide a specific, actionable suggestion to fix it.
-    4. Categorize: "brand", "accessibility", "policy", or "quality"
-    5. Assign severity: "critical", "major", or "minor"
-    
-    Rules to Check:
-    ${rules.map((rule, i) => `${i + 1}. ${rule}`).join("\n")}
-  `;
+  const normalizedRules = rules.map((rule, index) =>
+    typeof rule === "string"
+      ? {
+          id: `platform-rule-${index}`,
+          title: `Platform Rule ${index + 1}`,
+          instruction: rule,
+          source: "platform" as const,
+          engine: "visual" as const,
+          enabled: true,
+        }
+      : {
+          ...rule,
+          source: rule.source || "platform",
+          engine: rule.engine || "visual",
+          enabled: rule.enabled !== false,
+        }
+  );
 
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const promptBase = buildCompliancePrompt({
+    rules: normalizedRules,
+    config: promptLayers,
+  });
+  const elementsContext =
+    analysisResult?.elements?.length
+      ? [
+          "Detected Elements:",
+          ...analysisResult.elements.map((element) => {
+            const bounds = `box=(${element.box.xmin.toFixed(3)}, ${element.box.ymin.toFixed(
+              3
+            )})-(${element.box.xmax.toFixed(3)}, ${element.box.ymax.toFixed(3)})`;
+            return `- ${element.id}: [${element.category}] ${element.content} ${bounds}`;
+          }),
+          "When a rule depends on one or more detected elements, return their ids in relatedElementIds. Use only ids from this list. Return an empty array or omit the field if no element can be referenced confidently.",
+        ].join("\n")
+      : "";
+  const prompt = [promptBase, elementsContext].filter(Boolean).join("\n\n");
+
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_ANALYSIS_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
   console.log(`[Gemini] Making compliance API request...`);
 
   try {
@@ -233,6 +289,10 @@ export const checkComplianceWithGemini = async (
                     severity: {
                       type: "STRING",
                       enum: ["critical", "major", "minor"],
+                    },
+                    relatedElementIds: {
+                      type: "ARRAY",
+                      items: { type: "STRING" },
                     },
                   },
                   required: [
@@ -283,17 +343,26 @@ export const checkComplianceWithGemini = async (
       `[Gemini] Parsed compliance results: ${parsedData.results?.length || 0}`
     );
 
-    const results = rules.map((rule, index) => {
+    const results = normalizedRules.map((rule, index) => {
       const found = parsedData.results.find(
         (r: any) => r.ruleIndex === index + 1
       );
       return {
-        rule: rule,
+        rule: rule.instruction,
         status: found?.status || "WARNING",
         reasoning: found?.reasoning || "Could not verify this rule.",
         suggestion: found?.suggestion,
         category: found?.category || "policy",
-        severity: found?.severity || "major",
+        severity: found?.severity || rule.severity || "major",
+        ruleId: rule.id,
+        ruleTitle: rule.title,
+        ruleSource: rule.source || "platform",
+        checkType: rule.checkType,
+        brandId: rule.brandId,
+        engine: rule.engine || "visual",
+        relatedElementIds: Array.isArray(found?.relatedElementIds)
+          ? found.relatedElementIds.filter((value: unknown) => typeof value === "string")
+          : undefined,
       };
     });
 
@@ -314,11 +383,15 @@ export const checkComplianceWithGemini = async (
 export const calculateComplianceScores = (
   results: ComplianceResult[]
 ): ComplianceScores => {
+  const visualResults = results.filter(
+    (result) => (result.engine || "visual") === "visual"
+  );
+
   const breakdown = {
-    passed: results.filter((r) => r.status === "PASS").length,
-    failed: results.filter((r) => r.status === "FAIL").length,
-    warnings: results.filter((r) => r.status === "WARNING").length,
-    total: results.length,
+    passed: visualResults.filter((r) => r.status === "PASS").length,
+    failed: visualResults.filter((r) => r.status === "FAIL").length,
+    warnings: visualResults.filter((r) => r.status === "WARNING").length,
+    total: visualResults.length,
   };
 
   const calculateWeightedScore = (items: ComplianceResult[]): number => {
@@ -344,15 +417,15 @@ export const calculateComplianceScores = (
       : 100;
   };
 
-  const brandRules = results.filter((r) => r.category === "brand");
-  const accessibilityRules = results.filter(
+  const brandRules = visualResults.filter((r) => r.category === "brand");
+  const accessibilityRules = visualResults.filter(
     (r) => r.category === "accessibility"
   );
-  const policyRules = results.filter((r) => r.category === "policy");
-  const qualityRules = results.filter((r) => r.category === "quality");
+  const policyRules = visualResults.filter((r) => r.category === "policy");
+  const qualityRules = visualResults.filter((r) => r.category === "quality");
 
   return {
-    overall: calculateWeightedScore(results),
+    overall: calculateWeightedScore(visualResults),
     brand: calculateWeightedScore(brandRules),
     accessibility: calculateWeightedScore(accessibilityRules),
     policy: calculateWeightedScore(policyRules),

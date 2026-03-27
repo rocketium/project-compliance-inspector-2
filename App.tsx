@@ -8,6 +8,7 @@ import {
 import {
   AnalysisResult,
   AppState,
+  BrandConfig,
   PlatformConfig,
   ComplianceResult,
 } from "./types";
@@ -38,11 +39,16 @@ import { Login } from "./components/Login";
 import { EvaluateProject } from "./components/EvaluateProject";
 import { EvaluationHistory } from "./components/EvaluationHistory";
 import { EvaluationPreview } from "./components/EvaluationPreview";
+import { ExtensionPanel } from "./components/ExtensionPanel";
 import { DEFAULT_PLATFORMS } from "./constants/platforms";
+import { createEvaluationJob } from "./services/evaluationApi";
+import { loadBrands, loadPlatforms } from "./services/configService";
+import { parseRocketiumSource } from "./lib/rocketiumSource";
+import { buildEvaluationRules, buildPromptLayerConfig } from "./lib/ruleBundle";
 import {
-  createEvaluationJob,
-  extractProjectIdFromUrl as extractId,
-} from "./services/evaluationApi";
+  createPrecisionUnavailableResults,
+  partitionRulesByEngine,
+} from "./lib/precisionRules";
 
 // Theme toggle button component
 const ThemeToggle: React.FC = () => {
@@ -51,56 +57,12 @@ const ThemeToggle: React.FC = () => {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-500 dark:text-slate-400"
+      className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors text-slate-500 dark:text-zinc-400"
       title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
     >
       {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
     </button>
   );
-};
-
-// Helper function to extract project ID from URL or return as-is if it's already an ID
-const extractProjectIdFromUrl = (input: string): string | null => {
-  const trimmed = input.trim();
-
-  // Check if it's a URL containing /campaign/p/ or /p/
-  // URL patterns:
-  // - https://rocketium.com/campaign/p/{projectId}/{name}/view
-  // - http://localhost:3000/campaign/p/{projectId}/{name}/view
-  const urlPattern = /\/campaign\/p\/([^\/]+)/;
-  const match = trimmed.match(urlPattern);
-
-  if (match && match[1]) {
-    return match[1];
-  }
-
-  // Also try simpler /p/ pattern
-  const simplePattern = /\/p\/([^\/]+)/;
-  const simpleMatch = trimmed.match(simplePattern);
-
-  if (simpleMatch && simpleMatch[1]) {
-    return simpleMatch[1];
-  }
-
-  // If no URL pattern found, assume it's already a project ID
-  // Basic validation: should contain alphanumeric chars and possibly hyphens
-  if (/^[a-zA-Z0-9-]+$/.test(trimmed)) {
-    return trimmed;
-  }
-
-  // Try to extract from any URL-like string
-  try {
-    const url = new URL(trimmed);
-    const pathParts = url.pathname.split("/").filter(Boolean);
-    const pIndex = pathParts.indexOf("p");
-    if (pIndex !== -1 && pathParts[pIndex + 1]) {
-      return pathParts[pIndex + 1];
-    }
-  } catch {
-    // Not a valid URL, return as-is
-  }
-
-  return trimmed || null;
 };
 
 const AppContent: React.FC = () => {
@@ -128,34 +90,25 @@ const AppContent: React.FC = () => {
   // Platform Management
   const [platforms, setPlatforms] =
     useState<PlatformConfig[]>(DEFAULT_PLATFORMS);
+  const [brands, setBrands] = useState<BrandConfig[]>([]);
   // Initialize platform from URL parameter immediately to avoid race condition
   const [activePlatformId, setActivePlatformId] = useState<string>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("platform") || "default";
   });
+  const [activeBrandId, setActiveBrandId] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("brand") || "";
+  });
 
-  const fetchPlatforms = async () => {
+  const fetchConfig = async () => {
     try {
-      const res = await fetch("/api/platforms");
-      if (res.ok) {
-        const data = await res.json();
-        setPlatforms(data);
-      } else {
-        // Handle 404 or other errors without crashing
-        console.warn(
-          "Could not fetch platforms from API, checking fallback..."
-        );
-        try {
-          // Fallback to json file if api is 404 (static hosting)
-          const staticRes = await fetch("/platforms.json");
-          if (staticRes.ok) {
-            const staticData = await staticRes.json();
-            setPlatforms(staticData);
-          }
-        } catch (e) {
-          console.warn("Using default fallback configuration");
-        }
-      }
+      const [platformData, brandData] = await Promise.all([
+        loadPlatforms(),
+        loadBrands(),
+      ]);
+      setPlatforms(platformData);
+      setBrands(brandData);
     } catch (err) {
       console.warn("Using default fallback configuration due to network error");
       // Keep DEFAULT_PLATFORMS
@@ -163,14 +116,17 @@ const AppContent: React.FC = () => {
   };
 
   useEffect(() => {
-    // 1. Load Platforms
-    fetchPlatforms();
+    // 1. Load Config
+    fetchConfig();
 
     // 2. Ensure platform param is in URL (state already initialized from URL)
     const params = new URLSearchParams(window.location.search);
     if (!params.has("platform")) {
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.set("platform", activePlatformId);
+      if (activeBrandId) {
+        newUrl.searchParams.set("brand", activeBrandId);
+      }
       window.history.replaceState({}, "", newUrl);
     }
 
@@ -204,14 +160,20 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const currentPlatform = params.get("platform");
+    const currentBrand = params.get("brand") || "";
 
     // Only update URL if it's different from current query param
-    if (currentPlatform !== activePlatformId) {
+    if (currentPlatform !== activePlatformId || currentBrand !== activeBrandId) {
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.set("platform", activePlatformId);
+      if (activeBrandId) {
+        newUrl.searchParams.set("brand", activeBrandId);
+      } else {
+        newUrl.searchParams.delete("brand");
+      }
       window.history.replaceState({}, "", newUrl);
     }
-  }, [activePlatformId]);
+  }, [activePlatformId, activeBrandId]);
 
   // Save to localStorage whenever analysis or compliance results change
   useEffect(() => {
@@ -222,6 +184,7 @@ const AppContent: React.FC = () => {
           analysisResult,
           complianceResults,
           platformId: activePlatformId,
+          brandId: activeBrandId,
           timestamp: Date.now(),
         };
         localStorage.setItem("adAnalyzerResults", JSON.stringify(dataToSave));
@@ -235,6 +198,7 @@ const AppContent: React.FC = () => {
     analysisResult,
     complianceResults,
     activePlatformId,
+    activeBrandId,
   ]);
 
   // Use derived active platform, strictly falling back if ID not found
@@ -242,6 +206,9 @@ const AppContent: React.FC = () => {
     platforms.find((p) => p.id === activePlatformId) ||
     platforms[0] ||
     DEFAULT_PLATFORMS[0];
+  const activeBrand =
+    brands.find((brand) => brand.id === activeBrandId) || null;
+  const activeRuleMode = activeBrand ? "combined" : "platform";
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -292,25 +259,51 @@ const AppContent: React.FC = () => {
         base64Data,
         mimeType,
         activePlatform.prompt,
-        "seed-dream"
+        buildPromptLayerConfig({
+          platform: activePlatform,
+          brand: activeBrand,
+          ruleMode: activeRuleMode,
+        })
       );
       setAnalysisResult(result);
       setAppState(AppState.SUCCESS);
 
       // Run compliance check asynchronously (don't await)
-      if (
-        activePlatform.complianceRules &&
-        activePlatform.complianceRules.length > 0
-      ) {
+      const evaluationRules = buildEvaluationRules({
+        platform: activePlatform,
+        brand: activeBrand,
+        ruleMode: activeRuleMode,
+      });
+      const { visualRules, precisionRules } = partitionRulesByEngine(evaluationRules);
+
+      if (visualRules.length > 0 || precisionRules.length > 0) {
         setIsComplianceLoading(true);
-        checkComplianceWithGemini(
-          base64Data,
-          mimeType,
-          activePlatform.complianceRules,
-          "seed-dream"
-        )
-          .then((results) => {
-            setComplianceResults(results);
+        Promise.resolve()
+          .then(async () => {
+            const results =
+              visualRules.length > 0
+                ? await checkComplianceWithGemini(
+                    base64Data,
+                    mimeType,
+                    visualRules,
+                    buildPromptLayerConfig({
+                      platform: activePlatform,
+                      brand: activeBrand,
+                      ruleMode: activeRuleMode,
+                    }),
+                    result
+                  )
+                : [];
+
+            const skippedPrecisionResults =
+              precisionRules.length > 0
+                ? createPrecisionUnavailableResults(
+                    precisionRules,
+                    "Fact-based capsule checks require a Rocketium project/capsule link and were skipped for this uploaded image."
+                  )
+                : [];
+
+            setComplianceResults([...results, ...skippedPrecisionResults]);
             setIsComplianceLoading(false);
           })
           .catch((err) => {
@@ -359,10 +352,11 @@ const AppContent: React.FC = () => {
     setErrorMsg(null);
 
     try {
-      const result = await createEvaluationJob(
-        projectId.trim(),
-        activePlatformId
-      );
+      const result = await createEvaluationJob(projectId.trim(), {
+        platform: activePlatform,
+        brand: activeBrand,
+        ruleMode: activeRuleMode,
+      });
 
       if (result.success && result.shareableUrl) {
         setShareableLink(result.shareableUrl);
@@ -405,12 +399,12 @@ const AppContent: React.FC = () => {
   // Render Admin Panel
   if (showAdmin) {
     return (
-      <div className="min-h-screen bg-slate-100 dark:bg-slate-900">
+      <div className="min-h-screen bg-slate-100 dark:bg-zinc-950">
         <AdminPanel
           onClose={() => {
             setShowAdmin(false);
             window.history.pushState({}, "", "/");
-            fetchPlatforms(); // Refresh data
+            fetchConfig(); // Refresh data
           }}
           currentPlatforms={platforms}
         />
@@ -419,16 +413,20 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col transition-colors">
       {/* Header */}
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30">
+      <header className="bg-white dark:bg-zinc-950 border-b border-slate-200 dark:border-zinc-800 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-indigo-600 p-1.5 rounded-lg">
-              <Sparkles className="text-white h-5 w-5" />
+          <div className="flex items-center gap-3">
+            <div className="shrink-0 flex items-center justify-center">
+              <img
+                src="/eye-ai-review.svg"
+                alt="Rocketium Review"
+                className="block h-7 w-auto object-contain -translate-y-0.5"
+              />
             </div>
-            <h1 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">
-              Rocketium AI
+            <h1 className="flex items-center text-xl font-bold text-slate-800 dark:text-zinc-100 tracking-tight leading-none">
+              Rocketium Review
             </h1>
           </div>
           <div className="flex items-center gap-3">
@@ -450,9 +448,13 @@ const AppContent: React.FC = () => {
             <div className="relative">
               <button
                 onClick={() => setShowPlatformDropdown(!showPlatformDropdown)}
-                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors text-sm font-medium text-slate-700 dark:text-slate-200"
+                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 rounded-lg hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors text-sm font-medium text-slate-700 dark:text-zinc-200"
               >
-                <span>{activePlatform.name}</span>
+                <span className="truncate max-w-[240px]">
+                  {activeBrand
+                    ? `${activePlatform.name} · ${activeBrand.name}`
+                    : activePlatform.name}
+                </span>
                 <ChevronDown
                   size={16}
                   className={`transition-transform ${
@@ -467,7 +469,10 @@ const AppContent: React.FC = () => {
                     className="fixed inset-0 z-10"
                     onClick={() => setShowPlatformDropdown(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-20 max-h-96 overflow-y-auto">
+                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg shadow-lg z-20 max-h-96 overflow-y-auto">
+                    <div className="px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-zinc-500">
+                      Platforms
+                    </div>
                     {platforms.map((p) => (
                       <button
                         key={p.id}
@@ -475,18 +480,63 @@ const AppContent: React.FC = () => {
                           setActivePlatformId(p.id);
                           const newUrl = new URL(window.location.href);
                           newUrl.searchParams.set("platform", p.id);
+                          if (activeBrandId) {
+                            newUrl.searchParams.set("brand", activeBrandId);
+                          }
                           window.history.pushState({}, "", newUrl);
                           setShowPlatformDropdown(false);
                         }}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors ${
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 dark:hover:bg-zinc-800 transition-colors ${
                           activePlatformId === p.id
-                            ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium"
-                            : "text-slate-700 dark:text-slate-300"
+                            ? "bg-indigo-50 dark:bg-zinc-800 text-indigo-700 dark:text-zinc-100 font-medium"
+                            : "text-slate-700 dark:text-zinc-300"
                         }`}
                       >
                         {p.name}
                       </button>
                     ))}
+
+                    <div className="border-t border-slate-200 dark:border-zinc-800 mt-1 pt-1">
+                      <div className="px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-zinc-500">
+                        Brand Rules
+                      </div>
+                      <button
+                        onClick={() => {
+                          setActiveBrandId("");
+                          const newUrl = new URL(window.location.href);
+                          newUrl.searchParams.delete("brand");
+                          window.history.pushState({}, "", newUrl);
+                          setShowPlatformDropdown(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 dark:hover:bg-zinc-800 transition-colors ${
+                          !activeBrandId
+                            ? "bg-indigo-50 dark:bg-zinc-800 text-indigo-700 dark:text-zinc-100 font-medium"
+                            : "text-slate-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        No brand rules
+                      </button>
+                      {brands.map((brand) => (
+                        <button
+                          key={brand.id}
+                          onClick={() => {
+                            setActiveBrandId(brand.id);
+                            const newUrl = new URL(window.location.href);
+                            newUrl.searchParams.set("platform", activePlatformId);
+                            newUrl.searchParams.set("brand", brand.id);
+                            window.history.pushState({}, "", newUrl);
+                            setShowPlatformDropdown(false);
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 dark:hover:bg-zinc-800 transition-colors ${
+                            activeBrandId === brand.id
+                              ? "bg-indigo-50 dark:bg-zinc-800 text-indigo-700 dark:text-zinc-100 font-medium"
+                              : "text-slate-700 dark:text-zinc-300"
+                          }`}
+                        >
+                          {brand.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </>
               )}
@@ -495,7 +545,7 @@ const AppContent: React.FC = () => {
             {/* History Button */}
             <button
               onClick={() => navigate("/history")}
-              className="p-1.5 rounded-lg bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200/80 dark:hover:bg-slate-700/50 transition-all duration-200 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 backdrop-blur-sm"
+              className="p-1.5 rounded-lg bg-slate-100/80 dark:bg-zinc-900 hover:bg-slate-200/80 dark:hover:bg-zinc-800 transition-all duration-200 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200 backdrop-blur-sm"
               title="View History"
             >
               <History size={18} />
@@ -504,7 +554,7 @@ const AppContent: React.FC = () => {
 
             <button
               onClick={() => setShowAdmin(true)}
-              className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"
+              className="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors p-2 hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-full"
               title="Settings"
             >
               <Settings size={20} />
@@ -518,13 +568,13 @@ const AppContent: React.FC = () => {
         {appState === AppState.IDLE && !imagePreview && (
           <div className="max-w-2xl mx-auto mt-12">
             <div className="text-center mb-10">
-              <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-4">
+              <h2 className="text-3xl font-bold text-slate-800 dark:text-zinc-100 mb-4">
                 Extract logic from visual chaos
               </h2>
-              <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed">
+              <p className="text-lg text-slate-600 dark:text-zinc-400 leading-relaxed">
                 Upload an advertisement, flyer, or UI design. The AI will
                 analyze the layout using the{" "}
-                <strong className="text-indigo-600 dark:text-indigo-400">
+                <strong className="text-indigo-600 dark:text-zinc-200">
                   {activePlatform.name}
                 </strong>{" "}
                 configuration.
@@ -532,16 +582,16 @@ const AppContent: React.FC = () => {
             </div>
 
             {/* Project Evaluation Section */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-8 shadow-sm">
+            <div className="bg-white dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800 p-6 mb-8 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
-                <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg">
-                  <Layers className="text-emerald-600 dark:text-emerald-400 h-5 w-5" />
+                <div className="bg-emerald-100 dark:bg-zinc-900 p-2 rounded-lg">
+                  <Layers className="text-emerald-600 dark:text-zinc-300 h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">
                     Evaluate Rocketium Project
                   </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-sm text-slate-500 dark:text-zinc-400">
                     Analyze all creatives in a project at once
                   </p>
                 </div>
@@ -549,37 +599,63 @@ const AppContent: React.FC = () => {
               <div className="flex gap-3 mb-4">
                 <input
                   type="text"
-                  placeholder="Paste project URL or ID (e.g., https://rocketium.com/campaign/p/xxx-123/...)"
+                  placeholder="Paste project URL, asset preview URL, or project ID"
                   value={projectId}
                   onChange={(e) => {
                     setProjectId(e.target.value);
                     setShareableLink(null);
                   }}
-                  className="flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                  className="flex-1 px-4 py-3 border border-slate-300 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 placeholder-slate-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && projectId.trim()) {
-                      const extractedId = extractProjectIdFromUrl(
-                        projectId.trim()
-                      );
-                      if (extractedId) {
-                        navigate(`/evaluate-project/${extractedId}`);
+                      const source = parseRocketiumSource(projectId.trim());
+                      if (!source) return;
+                      if (
+                        source.sourceType === "assetpreview" ||
+                        source.projectIds.length > 1
+                      ) {
+                        handleGenerateShareableLink();
+                        return;
                       }
+                      navigate(`/evaluate-project/${source.projectIds[0]}`);
                     }
                   }}
                 />
                 <button
-                  onClick={() => {
-                    if (projectId.trim()) {
-                      const extractedId = extractProjectIdFromUrl(
-                        projectId.trim()
-                      );
-                      if (extractedId) {
-                        navigate(`/evaluate-project/${extractedId}`);
+                  onClick={async () => {
+                    if (!projectId.trim()) return;
+                    const source = parseRocketiumSource(projectId.trim());
+                    if (!source) return;
+
+                    if (
+                      source.sourceType === "assetpreview" ||
+                      source.projectIds.length > 1
+                    ) {
+                      setIsGeneratingLink(true);
+                      setErrorMsg(null);
+                      try {
+                        const result = await createEvaluationJob(projectId.trim(), {
+                          platform: activePlatform,
+                          brand: activeBrand,
+                          ruleMode: activeRuleMode,
+                        });
+                        if (result.success && result.jobId) {
+                          navigate(`/preview/${result.jobId}`);
+                        } else {
+                          setErrorMsg(
+                            result.error || "Failed to create evaluation"
+                          );
+                        }
+                      } finally {
+                        setIsGeneratingLink(false);
                       }
+                      return;
                     }
+
+                    navigate(`/evaluate-project/${source.projectIds[0]}`);
                   }}
                   disabled={!projectId.trim()}
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white disabled:text-slate-500 dark:disabled:text-slate-400 font-medium rounded-lg transition-colors flex items-center gap-2"
+                  className="px-6 py-3 bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 disabled:bg-slate-300 dark:disabled:bg-zinc-800 text-white disabled:text-slate-500 dark:disabled:text-zinc-500 font-medium rounded-lg transition-colors flex items-center gap-2"
                 >
                   <Sparkles size={18} />
                   Evaluate
@@ -587,13 +663,13 @@ const AppContent: React.FC = () => {
               </div>
 
               {/* Generate Shareable Link Section */}
-              <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+              <div className="border-t border-slate-200 dark:border-zinc-800 pt-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <Link2 size={16} className="text-indigo-500" />
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <Link2 size={16} className="text-indigo-500 dark:text-zinc-400" />
+                  <span className="text-sm font-medium text-slate-700 dark:text-zinc-300">
                     Or generate a shareable link
                   </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                  <span className="text-xs text-slate-500 dark:text-zinc-400">
                     (analysis runs in background)
                   </span>
                 </div>
@@ -602,7 +678,7 @@ const AppContent: React.FC = () => {
                   <button
                     onClick={handleGenerateShareableLink}
                     disabled={!projectId.trim() || isGeneratingLink}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white disabled:text-slate-500 dark:disabled:text-slate-400 font-medium rounded-lg transition-colors flex items-center gap-2 text-sm"
+                  className="px-4 py-2 bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 disabled:bg-slate-300 dark:disabled:bg-zinc-800 text-white disabled:text-slate-500 dark:disabled:text-zinc-500 font-medium rounded-lg transition-colors flex items-center gap-2 text-sm"
                   >
                     {isGeneratingLink ? (
                       <>
@@ -618,27 +694,27 @@ const AppContent: React.FC = () => {
                   </button>
 
                   {shareableLink && (
-                    <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                    <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-emerald-50 dark:bg-zinc-900 border border-emerald-200 dark:border-zinc-800 rounded-lg">
                       <input
                         type="text"
                         value={shareableLink}
                         readOnly
-                        className="flex-1 bg-transparent text-sm text-emerald-700 dark:text-emerald-300 outline-none"
+                        className="flex-1 bg-transparent text-sm text-emerald-700 dark:text-zinc-200 outline-none"
                       />
                       <button
                         onClick={copyShareableLink}
-                        className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-800/30 rounded transition-colors"
+                        className="p-1.5 hover:bg-emerald-100 dark:hover:bg-zinc-800 rounded transition-colors"
                         title="Copy link"
                       >
                         {linkCopied ? (
                           <Check
                             size={16}
-                            className="text-emerald-600 dark:text-emerald-400"
+                            className="text-emerald-600 dark:text-zinc-300"
                           />
                         ) : (
                           <Copy
                             size={16}
-                            className="text-emerald-600 dark:text-emerald-400"
+                            className="text-emerald-600 dark:text-zinc-300"
                           />
                         )}
                       </button>
@@ -646,12 +722,12 @@ const AppContent: React.FC = () => {
                         href={shareableLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-800/30 rounded transition-colors"
+                        className="p-1.5 hover:bg-emerald-100 dark:hover:bg-zinc-800 rounded transition-colors"
                         title="Open in new tab"
                       >
                         <ExternalLink
                           size={16}
-                          className="text-emerald-600 dark:text-emerald-400"
+                          className="text-emerald-600 dark:text-zinc-300"
                         />
                       </a>
                     </div>
@@ -662,23 +738,23 @@ const AppContent: React.FC = () => {
 
             <div className="relative mb-8">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
+                <div className="w-full border-t border-slate-200 dark:border-zinc-800"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400">
+                <span className="px-4 bg-slate-50 dark:bg-zinc-950 text-slate-500 dark:text-zinc-400">
                   or analyze a single image
                 </span>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 p-12 text-center hover:border-indigo-500 dark:hover:border-indigo-400 transition-colors shadow-sm group">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 mb-6 group-hover:scale-110 transition-transform">
+            <div className="bg-white dark:bg-zinc-950 rounded-2xl border-2 border-dashed border-slate-300 dark:border-zinc-800 p-12 text-center hover:border-indigo-500 dark:hover:border-zinc-700 transition-colors shadow-sm group">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-indigo-50 dark:bg-zinc-900 text-indigo-600 dark:text-zinc-300 mb-6 group-hover:scale-110 transition-transform">
                 <UploadCloud size={32} />
               </div>
-              <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+              <h3 className="text-xl font-semibold text-slate-900 dark:text-zinc-100 mb-2">
                 Upload an image to analyze
               </h3>
-              <p className="text-slate-500 dark:text-slate-400 mb-8">
+              <p className="text-slate-500 dark:text-zinc-400 mb-8">
                 Supported formats: JPEG, PNG, WEBP
               </p>
 
@@ -689,7 +765,7 @@ const AppContent: React.FC = () => {
                   accept="image/*"
                   onChange={handleFileChange}
                 />
-                <span className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg font-medium transition-colors shadow-sm hover:shadow flex items-center gap-2">
+                <span className="cursor-pointer bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 text-white px-8 py-3 rounded-lg font-medium transition-colors shadow-sm hover:shadow flex items-center gap-2">
                   <FileImage size={18} />
                   Select Image
                 </span>
@@ -701,7 +777,7 @@ const AppContent: React.FC = () => {
         {/* IDLE STATE: Preview */}
         {appState === AppState.IDLE && imagePreview && (
           <div className="max-w-4xl mx-auto flex flex-col items-center">
-            <div className="w-full bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden p-4 mb-8">
+            <div className="w-full bg-white dark:bg-zinc-950 rounded-2xl shadow-sm border border-slate-200 dark:border-zinc-800 overflow-hidden p-4 mb-8">
               <img
                 src={imagePreview}
                 alt="Preview"
@@ -712,13 +788,13 @@ const AppContent: React.FC = () => {
             <div className="flex gap-4">
               <button
                 onClick={handleReset}
-                className="px-6 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-medium rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                className="px-6 py-3 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 text-slate-700 dark:text-zinc-200 font-medium rounded-xl hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAnalyze}
-                className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 flex items-center gap-2"
+                className="px-8 py-3 bg-violet-600 dark:bg-violet-600 dark:hover:bg-violet-500 text-white font-medium rounded-xl hover:bg-violet-700 transition-all shadow-lg shadow-violet-200/60 dark:shadow-black/20 flex items-center gap-2"
               >
                 <Sparkles size={18} />
                 Run Deep Analysis
@@ -731,36 +807,36 @@ const AppContent: React.FC = () => {
         {appState === AppState.ANALYZING && (
           <div className="max-w-lg mx-auto text-center mt-20">
             <div className="relative w-24 h-24 mx-auto mb-8">
-              <div className="absolute inset-0 border-4 border-slate-100 dark:border-slate-700 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-slate-100 dark:border-zinc-800 rounded-full"></div>
               <div className="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
-              <div className="absolute inset-0 flex items-center justify-center font-mono text-indigo-600 dark:text-indigo-400 font-bold text-lg">
+              <div className="absolute inset-0 flex items-center justify-center font-mono text-indigo-600 dark:text-zinc-300 font-bold text-lg">
                 {thinkingTime}s
               </div>
             </div>
-            <h3 className="text-2xl font-bold text-slate-800 dark:text-white mb-3">
+            <h3 className="text-2xl font-bold text-slate-800 dark:text-zinc-100 mb-3">
               Analyzing visual structure...
             </h3>
-            <p className="text-slate-500 dark:text-slate-400 mb-8">
+            <p className="text-slate-500 dark:text-zinc-400 mb-8">
               Thinking mode enabled. Using{" "}
-              <strong className="text-slate-700 dark:text-slate-200">
+              <strong className="text-slate-700 dark:text-zinc-200">
                 {activePlatform.name}
               </strong>{" "}
               logic to deconstruct the image.
             </p>
-            <div className="mb-6 inline-block bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded font-mono text-xs text-slate-500 dark:text-slate-400">
+            <div className="mb-6 inline-block bg-slate-100 dark:bg-zinc-900 px-4 py-2 rounded font-mono text-xs text-slate-500 dark:text-zinc-400">
               Platform: {activePlatformId}
             </div>
 
             <div className="space-y-3 max-w-xs mx-auto text-left">
-              <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400 animate-pulse">
+              <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-zinc-400 animate-pulse">
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                 Detecting text regions
               </div>
-              <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400 animate-pulse delay-150">
+              <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-zinc-400 animate-pulse delay-150">
                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                 Calculating bounding boxes
               </div>
-              <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400 animate-pulse delay-300">
+              <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-zinc-400 animate-pulse delay-300">
                 <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
                 Categorizing visual elements
               </div>
@@ -771,18 +847,18 @@ const AppContent: React.FC = () => {
         {/* ERROR STATE */}
         {appState === AppState.ERROR && (
           <div className="max-w-md mx-auto mt-20 text-center">
-            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-16 h-16 bg-red-100 dark:bg-zinc-900 text-red-600 dark:text-zinc-300 rounded-full flex items-center justify-center mx-auto mb-6">
               <AlertCircle size={32} />
             </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-zinc-100 mb-2">
               Analysis Failed
             </h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-8">
+            <p className="text-slate-600 dark:text-zinc-400 mb-8">
               {errorMsg}
             </p>
             <button
               onClick={handleReset}
-              className="px-6 py-2 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 rounded-lg hover:bg-slate-900 dark:hover:bg-white transition-colors"
+              className="px-6 py-2 bg-slate-800 dark:bg-zinc-100 text-white dark:text-zinc-950 rounded-lg hover:bg-slate-900 dark:hover:bg-white transition-colors"
             >
               Try Again
             </button>
@@ -808,13 +884,13 @@ const AppContent: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 py-4">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-slate-500 dark:text-slate-400">
+      <footer className="bg-white dark:bg-zinc-950 border-t border-slate-200 dark:border-zinc-800 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-slate-500 dark:text-zinc-400">
           <a
             href="https://rocketium.ai"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium transition-colors"
+            className="text-indigo-600 dark:text-zinc-300 hover:text-indigo-700 dark:hover:text-zinc-100 font-medium transition-colors"
           >
             Rocketium
           </a>{" "}
@@ -853,6 +929,7 @@ const ThemedApp: React.FC = () => {
         />
         <Route path="/preview/:jobId" element={<EvaluationPreview />} />
         <Route path="/history" element={<EvaluationHistory />} />
+        <Route path="/extension-panel" element={<ExtensionPanel />} />
       </Routes>
     </ConfigProvider>
   );

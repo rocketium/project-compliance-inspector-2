@@ -11,6 +11,7 @@ export interface EvaluationJob {
   created_at: string;
   updated_at: string;
   error?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface EvaluationCreative {
@@ -19,7 +20,10 @@ export interface EvaluationCreative {
   name: string;
   dimensionKey: string;
   variationId: string;
+  capsuleId?: string;
   variationName?: string;
+  sourceProjectId?: string;
+  sourceProjectName?: string;
   width?: number;
   height?: number;
   status: "pending" | "analyzing" | "completed" | "failed";
@@ -53,6 +57,113 @@ export interface ComplianceResult {
   suggestion?: string;
   category?: string;
   severity?: string;
+  ruleId?: string;
+  ruleTitle?: string;
+  ruleSource?: "platform" | "brand";
+  checkType?: string;
+  brandId?: string;
+  engine?: "visual" | "precision";
+  actualValue?: string | number | boolean;
+  expectedValue?: string | number | boolean;
+  matchedLayerName?: string;
+  matchedLayerId?: string;
+  referenceLayerName?: string;
+  evaluationMessage?: string;
+  relatedElementIds?: string[];
+}
+
+export type PrecisionSelectorType = "layerName" | "textContent";
+export type PrecisionLayerKind = "text" | "shape" | "image";
+
+export type PrecisionFact =
+  | "fontSize"
+  | "fontWeight"
+  | "fontFamilyName"
+  | "fontFamilyId"
+  | "fontStyle"
+  | "textAlign"
+  | "textFill"
+  | "fill"
+  | "cornerRadius"
+  | "opacity"
+  | "objectFit"
+  | "imageWidth"
+  | "imageHeight"
+  | "imageLeft"
+  | "imageTop"
+  | "scale"
+  | "scaleX"
+  | "scaleY"
+  | "x"
+  | "y"
+  | "width"
+  | "height"
+  | "left"
+  | "right"
+  | "top"
+  | "bottom"
+  | "centerX"
+  | "centerY"
+  | "wordStyle.fontSize"
+  | "wordStyle.fontWeight"
+  | "wordStyle.fontFamilyName"
+  | "wordStyle.fontFamilyId"
+  | "wordStyle.fontStyle"
+  | "wordStyle.superscript"
+  | "wordStyle.subscript"
+  | "wordStyle.deltaY";
+
+export type PrecisionOperator =
+  | "eq"
+  | "neq"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "between";
+
+export interface PrecisionSelector {
+  type: PrecisionSelectorType;
+  value: string;
+  layerKind?: PrecisionLayerKind;
+}
+
+export interface PrecisionLayerFactRef {
+  kind: "layerFact";
+  selector: PrecisionSelector;
+  fact: PrecisionFact;
+  wordStyleText?: string;
+}
+
+export interface PrecisionLiteralRef {
+  kind: "literal";
+  value: string | number | boolean;
+}
+
+export type PrecisionOperand = PrecisionLayerFactRef | PrecisionLiteralRef;
+
+export interface PrecisionRuleConfig {
+  selector: PrecisionSelector;
+  fact: PrecisionFact;
+  operator: PrecisionOperator;
+  expected?: string | number | boolean;
+  reference?: PrecisionLayerFactRef;
+  min?: PrecisionOperand;
+  max?: PrecisionOperand;
+  wordStyleText?: string;
+}
+
+export interface ComplianceRuleDefinition {
+  id: string;
+  title: string;
+  instruction: string;
+  checkType?: string;
+  severity?: "critical" | "major" | "minor";
+  enabled?: boolean;
+  engine?: "visual" | "precision";
+  source?: "platform" | "brand";
+  brandId?: string;
+  precisionConfig?: PrecisionRuleConfig;
 }
 
 export interface ComplianceScores {
@@ -74,6 +185,7 @@ export interface PlatformConfig {
   name: string;
   category?: string;
   prompt?: string;
+  systemPrompt?: string;
   complianceRules?: string[];
   imageSpecs?: {
     allowedFormats?: string[];

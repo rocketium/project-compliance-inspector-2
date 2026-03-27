@@ -35,6 +35,83 @@ View your app in AI Studio: https://ai.studio/apps/drive/1pSrIvrSggxHUQi0UzqZtXe
 4. Run the app:
    `npm run dev`
 
+## New in Phase 1
+
+- **Multi-project asset preview links** are supported for shareable/background evaluations.
+- **Brand rule libraries** can be managed from the in-app admin screen.
+- **Chrome side-panel extension** lives in `extension/` and can be loaded as an unpacked extension.
+
+## Supabase migration
+
+Run the SQL in `supabase_migration.sql` to add:
+- `evaluation_jobs.metadata`
+- `platform_configs`
+- `brand_configs`
+
+## Chrome extension
+
+1. Open `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked**
+4. Select the `extension/` folder
+5. Set the **App Base URL** in the side panel to your deployed app URL or local Vite server
+
+## Local capsule proxy + tunnel
+
+Use this when you want to test **fact-based capsule rules locally** while keeping Mongo protected.
+
+### Local env
+
+Add these to `.env.local`:
+
+```env
+MONGODB_URI=your_mongodb_uri
+MONGODB_DB_NAME=rocketium_2
+CAPSULE_PROXY_KEY=your_proxy_shared_secret
+CAPSULE_PROXY_PORT=8787
+```
+
+### Start the local capsule proxy
+
+```bash
+npm run proxy:local
+```
+
+The local proxy reads `.env.local` automatically.
+
+### Start a public tunnel
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:8787
+```
+
+This gives you a temporary public URL like:
+
+```bash
+https://your-random-subdomain.trycloudflare.com
+```
+
+### Point Supabase to the tunnel
+
+```bash
+/tmp/supabase-cli/supabase secrets set CAPSULE_LOOKUP_BASE_URL='https://your-random-subdomain.trycloudflare.com' --project-ref ebiazcvcqgxytkyoqjuq
+/tmp/supabase-cli/supabase secrets set CAPSULE_LOOKUP_TOKEN='your_proxy_shared_secret' --project-ref ebiazcvcqgxytkyoqjuq
+/tmp/supabase-cli/supabase functions deploy create-evaluation --project-ref ebiazcvcqgxytkyoqjuq
+```
+
+### Test the proxy directly
+
+```bash
+curl -H 'x-capsule-proxy-key: your_proxy_shared_secret' \
+  'http://127.0.0.1:8787/api/capsules/69b28ccaf35e94046e80824f'
+```
+
+### Important note
+
+- Yes, you need to start the proxy and tunnel again each time you want **hosted Supabase** to call your **local machine**
+- Cloudflare quick tunnel URLs are temporary, so if the URL changes you must update `CAPSULE_LOOKUP_BASE_URL` and redeploy `create-evaluation`
+- The long-term replacement for this setup is the AWS Lambda proxy in `lambda/capsuleProxy.mjs`
+
 ## Authentication
 
 The app requires authentication and only allows users with `@rocketium.com` email addresses to sign in or sign up. 

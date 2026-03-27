@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Rocketium Review",
+  "version": "0.1.0",
+  "description": "Run Rocketium Review in a Chrome side panel.",
+  "icons": {
+    "16": "icons/logo-16.png",
+    "32": "icons/logo-32.png",
+    "48": "icons/logo-48.png",
+    "128": "icons/logo-128.png"
+  },
+  "permissions": ["sidePanel", "storage", "tabs", "activeTab"],
+  "host_permissions": [
+    "https://rocketium.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://*/*"
+  ],
+  "action": {
+    "default_title": "Open Rocketium Review",
+    "default_icon": {
+      "16": "icons/logo-16.png",
+      "32": "icons/logo-32.png",
+      "48": "icons/logo-48.png"
+    }
+  },
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  }
+}

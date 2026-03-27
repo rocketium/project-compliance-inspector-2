@@ -1,23 +1,31 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { AnalysisResult, ComplianceResult, ComplianceScores } from "../types";
+import {
+  AnalysisResult,
+  ComplianceResult,
+  ComplianceRuleDefinition,
+  ComplianceScores,
+  PromptLayerConfig,
+} from "../types";
+import { buildAnalysisPrompt, buildCompliancePrompt } from "../lib/promptLayers";
 
 // Initialize the Gemini API client
 // API key must be provided via process.env.API_KEY
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const GEMINI_ANALYSIS_MODEL = "gemini-3.1-pro-preview";
+const GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image-preview";
 
 /**
  * Analyzes an image to extract text and visual elements with bounding boxes.
- * Uses 'gemini-3-pro-preview' with high thinking budget for precision.
+ * Uses Gemini 3 Pro Preview with high thinking budget for precision.
  */
 export const analyzeImageWithGemini = async (
   base64Image: string,
   mimeType: string,
-  customPrompt?: string
+  customPrompt?: string,
+  promptLayers?: PromptLayerConfig | string
 ): Promise<AnalysisResult> => {
   try {
-    const model = "gemini-3-pro-preview";
-
     const defaultPrompt = `
       Analyze this advertisement or design image in extreme detail.
       
@@ -35,10 +43,13 @@ export const analyzeImageWithGemini = async (
       Ensure every visible piece of significant content is captured.
     `;
 
-    const prompt = customPrompt || defaultPrompt;
+    const prompt = buildAnalysisPrompt({
+      taskPrompt: customPrompt || defaultPrompt,
+      config: promptLayers,
+    });
 
     const response = await ai.models.generateContent({
-      model: model,
+      model: GEMINI_ANALYSIS_MODEL,
       contents: {
         parts: [
           {
@@ -139,7 +150,7 @@ export const analyzeImageWithGemini = async (
 
     // Normalize coordinates from 0-1000 back to 0-1 for easier frontend consumption
     const elements = parsedData.elements.map((el: any, index: number) => ({
-      id: `el-${index}-${Date.now()}`,
+      id: `el-${index + 1}`,
       content: el.content,
       category: el.category,
       box: {
@@ -167,43 +178,50 @@ export const analyzeImageWithGemini = async (
 export const checkComplianceWithGemini = async (
   base64Image: string,
   mimeType: string,
-  rules: string[]
+  rules: string[] | ComplianceRuleDefinition[],
+  promptLayers?: PromptLayerConfig | string,
+  analysisResult?: AnalysisResult
 ): Promise<ComplianceResult[]> => {
   try {
-    const model = "gemini-3-pro-preview";
+    const normalizedRules = rules.map((rule, index) =>
+      typeof rule === "string"
+        ? {
+            id: `platform-rule-${index}`,
+            title: `Platform Rule ${index + 1}`,
+            instruction: rule,
+            source: "platform" as const,
+            engine: "visual" as const,
+            enabled: true,
+          }
+        : {
+            ...rule,
+            source: rule.source || "platform",
+            engine: rule.engine || "visual",
+            enabled: rule.enabled !== false,
+          }
+    );
 
-    const prompt = `
-      You are a Strict Brand Compliance Officer and Creative Director. 
-      Evaluate the provided advertisement image against the following list of rules.
-      
-      For each rule:
-      1. Determine if the image passes, fails, or has a warning.
-      2. Provide specific reasoning for your decision.
-      3. If the rule FAILS or has a WARNING, provide a SPECIFIC, ACTIONABLE suggestion to fix it.
-         - Be precise with measurements, colors, and positions when possible.
-         - Example suggestions:
-           * "Move the logo 15-20px right to meet the 10% safe-area margin requirement"
-           * "Reduce headline from 32 characters to under 25 characters"
-           * "Increase text contrast ratio from ~2.5:1 to at least 4.5:1 by darkening the text or lightening the background"
-           * "Add a visible CTA button in the lower-right quadrant"
-      4. Categorize each rule into one of these categories:
-         - "brand": Logo usage, brand identity, co-branding rules
-         - "accessibility": Contrast, readability, alt-text, screen reader
-         - "policy": Platform-specific policies, prohibited content
-         - "quality": Creative quality, layout, cart-fit, visual appeal
-      5. Assign a severity level:
-         - "critical": Will cause rejection or major brand damage
-         - "major": Significant issue that should be fixed
-         - "minor": Improvement suggestion, not blocking
-      
-      Be extremely strict. Visual consistency is key.
-      
-      Rules to Check:
-      ${rules.map((rule, i) => `${i + 1}. ${rule}`).join("\n")}
-    `;
+    const promptBase = buildCompliancePrompt({
+      rules: normalizedRules,
+      config: promptLayers,
+    });
+    const elementsContext =
+      analysisResult?.elements?.length
+        ? [
+            "Detected Elements:",
+            ...analysisResult.elements.map((element) => {
+              const bounds = `box=(${element.box.xmin.toFixed(3)}, ${element.box.ymin.toFixed(
+                3
+              )})-(${element.box.xmax.toFixed(3)}, ${element.box.ymax.toFixed(3)})`;
+              return `- ${element.id}: [${element.category}] ${element.content} ${bounds}`;
+            }),
+            "When a rule depends on one or more detected elements, return their ids in relatedElementIds. Use only ids from this list. Return an empty array or omit the field if no element can be referenced confidently.",
+          ].join("\n")
+        : "";
+    const prompt = [promptBase, elementsContext].filter(Boolean).join("\n\n");
 
     const response = await ai.models.generateContent({
-      model: model,
+      model: GEMINI_ANALYSIS_MODEL,
       contents: {
         parts: [
           {
@@ -260,6 +278,14 @@ export const checkComplianceWithGemini = async (
                     enum: ["critical", "major", "minor"],
                     description: "Severity level of this rule violation.",
                   },
+                  relatedElementIds: {
+                    type: Type.ARRAY,
+                    description:
+                      "Optional list of detected element ids that directly support this rule result.",
+                    items: {
+                      type: Type.STRING,
+                    },
+                  },
                 },
                 required: [
                   "ruleIndex",
@@ -282,17 +308,26 @@ export const checkComplianceWithGemini = async (
     const parsedData = JSON.parse(resultText);
 
     // Map back to the original rules array
-    return rules.map((rule, index) => {
+    return normalizedRules.map((rule, index) => {
       const found = parsedData.results.find(
         (r: any) => r.ruleIndex === index + 1
       );
       return {
-        rule: rule,
+        rule: rule.instruction,
         status: found?.status || "WARNING",
         reasoning: found?.reasoning || "Could not verify this rule.",
         suggestion: found?.suggestion,
         category: found?.category || "policy",
-        severity: found?.severity || "major",
+        severity: found?.severity || rule.severity || "major",
+        ruleId: rule.id,
+        ruleTitle: rule.title,
+        ruleSource: rule.source || "platform",
+        checkType: rule.checkType,
+        brandId: rule.brandId,
+        engine: rule.engine || "visual",
+        relatedElementIds: Array.isArray(found?.relatedElementIds)
+          ? found.relatedElementIds.filter((value: unknown) => typeof value === "string")
+          : undefined,
       };
     });
   } catch (error) {
@@ -342,8 +377,6 @@ export const autoFixRuleWithGemini = async (
       )
       .join("\n");
 
-    const model = "gemini-3-pro-image-preview";
-
     const prompt = `
 You are an expert design compliance advisor. A compliance rule has failed, and you need to generate a FIXED version of the image.
 
@@ -370,7 +403,7 @@ Do NOT include annotations, arrows, boxes, or any markup. Generate the actual fi
 `;
 
     const response = await ai.models.generateContent({
-      model: model,
+      model: GEMINI_IMAGE_MODEL,
       contents: {
         parts: [
           {
@@ -420,11 +453,15 @@ Do NOT include annotations, arrows, boxes, or any markup. Generate the actual fi
 export const calculateComplianceScores = (
   results: ComplianceResult[]
 ): ComplianceScores => {
+  const visualResults = results.filter(
+    (result) => (result.engine || "visual") === "visual"
+  );
+
   const breakdown = {
-    passed: results.filter((r) => r.status === "PASS").length,
-    failed: results.filter((r) => r.status === "FAIL").length,
-    warnings: results.filter((r) => r.status === "WARNING").length,
-    total: results.length,
+    passed: visualResults.filter((r) => r.status === "PASS").length,
+    failed: visualResults.filter((r) => r.status === "FAIL").length,
+    warnings: visualResults.filter((r) => r.status === "WARNING").length,
+    total: visualResults.length,
   };
 
   // Calculate overall score with weighted severity
@@ -454,15 +491,15 @@ export const calculateComplianceScores = (
   };
 
   // Group by category
-  const brandRules = results.filter((r) => r.category === "brand");
-  const accessibilityRules = results.filter(
+  const brandRules = visualResults.filter((r) => r.category === "brand");
+  const accessibilityRules = visualResults.filter(
     (r) => r.category === "accessibility"
   );
-  const policyRules = results.filter((r) => r.category === "policy");
-  const qualityRules = results.filter((r) => r.category === "quality");
+  const policyRules = visualResults.filter((r) => r.category === "policy");
+  const qualityRules = visualResults.filter((r) => r.category === "quality");
 
   return {
-    overall: calculateWeightedScore(results),
+    overall: calculateWeightedScore(visualResults),
     brand: calculateWeightedScore(brandRules),
     accessibility: calculateWeightedScore(accessibilityRules),
     policy: calculateWeightedScore(policyRules),

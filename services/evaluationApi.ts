@@ -1,28 +1,47 @@
 import { supabase } from "../lib/supabase";
 import {
   analyzeImageWithGemini,
-  checkComplianceWithGemini,
   calculateComplianceScores,
+  checkComplianceWithGemini,
 } from "./gemini";
 import {
   StoredCreativeResult,
   saveProjectEvaluation,
 } from "./projectEvaluation";
-import {
-  PlatformConfig,
-  AnalysisResult,
-  ComplianceResult,
-  ComplianceScores,
-  AttentionInsightResult,
-} from "../types";
 import { DEFAULT_PLATFORMS } from "../constants/platforms";
+import { getFetchableAssetUrl } from "../lib/assetProxy";
+import { extractProjectIdFromUrl, parseRocketiumSource } from "../lib/rocketiumSource";
+import { buildEvaluationRules, buildPromptLayerConfig } from "../lib/ruleBundle";
+import {
+  createPrecisionUnavailableResults,
+  partitionRulesByEngine,
+} from "../lib/precisionRules";
+import {
+  AnalysisResult,
+  AttentionInsightResult,
+  BrandConfig,
+  ComplianceResult,
+  ComplianceRuleDefinition,
+  ComplianceScores,
+  EvaluationJobMetadata,
+  PlatformConfig,
+  PromptLayerConfig,
+  RocketiumSource,
+  RuleMode,
+} from "../types";
 
-// Types for evaluation jobs
 export interface EvaluationJob {
   id: string;
   projectId: string;
   projectName?: string;
   platformId: string;
+  brandId?: string;
+  brandName?: string;
+  ruleMode?: RuleMode;
+  sourceType?: "single" | "assetpreview";
+  sourceProjectIds: string[];
+  workspaceShortId?: string;
+  inputUrl?: string;
   status: "pending" | "analyzing" | "completed" | "failed";
   totalCreatives: number;
   analyzedCreatives: number;
@@ -38,7 +57,10 @@ export interface EvaluationCreative {
   name: string;
   dimensionKey: string;
   variationId: string;
+  capsuleId?: string;
   variationName?: string;
+  sourceProjectId?: string;
+  sourceProjectName?: string;
   width?: number;
   height?: number;
   status: "pending" | "analyzing" | "completed" | "failed";
@@ -49,61 +71,12 @@ export interface EvaluationCreative {
   error?: string;
 }
 
-// Generate a unique shareable ID
-const generateShareableId = (): string => {
-  const timestamp = Date.now().toString(36);
-  const randomPart = Math.random().toString(36).substring(2, 10);
-  return `eval-${timestamp}-${randomPart}`;
-};
+export interface CreateEvaluationJobOptions {
+  platform?: PlatformConfig | null;
+  brand?: BrandConfig | null;
+  ruleMode?: RuleMode;
+}
 
-// Get the API base URL based on current environment
-const getApiBaseUrl = () => {
-  if (typeof window === "undefined") return "https://rocketium.com";
-  const hostname = window.location.hostname;
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "http://localhost:3000";
-  }
-  return "https://rocketium.com";
-};
-
-// Get the app base URL for shareable links
-const getAppBaseUrl = () => {
-  if (typeof window === "undefined") return "";
-  return window.location.origin;
-};
-
-// Extract project ID from URL
-export const extractProjectIdFromUrl = (input: string): string | null => {
-  const trimmed = input.trim();
-
-  // Check URL patterns
-  const urlPattern = /\/campaign\/p\/([^\/]+)/;
-  const match = trimmed.match(urlPattern);
-  if (match && match[1]) return match[1];
-
-  const simplePattern = /\/p\/([^\/]+)/;
-  const simpleMatch = trimmed.match(simplePattern);
-  if (simpleMatch && simpleMatch[1]) return simpleMatch[1];
-
-  // If no URL pattern found, assume it's already a project ID
-  if (/^[a-zA-Z0-9-]+$/.test(trimmed)) return trimmed;
-
-  // Try to extract from any URL-like string
-  try {
-    const url = new URL(trimmed);
-    const pathParts = url.pathname.split("/").filter(Boolean);
-    const pIndex = pathParts.indexOf("p");
-    if (pIndex !== -1 && pathParts[pIndex + 1]) {
-      return pathParts[pIndex + 1];
-    }
-  } catch {
-    // Not a valid URL
-  }
-
-  return trimmed || null;
-};
-
-// Extract creatives from API response
 interface RocketiumVariation {
   _id: string;
   capsuleId?: string;
@@ -121,7 +94,119 @@ interface RocketiumVariation {
   [key: string]: any;
 }
 
-const extractCreativesFromResponse = (data: any): EvaluationCreative[] => {
+interface SourceProjectPayload {
+  projectId: string;
+  projectName?: string;
+  creatives: EvaluationCreative[];
+}
+
+const generateShareableId = (): string => {
+  const timestamp = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).substring(2, 10);
+  return `eval-${timestamp}-${randomPart}`;
+};
+
+const getApiBaseUrl = () => {
+  if (typeof window === "undefined") return "https://rocketium.com";
+  const env = (import.meta as any).env;
+  return (
+    env?.VITE_ROCKETIUM_API_BASE_URL?.replace(/\/$/, "") ||
+    "https://rocketium.com"
+  );
+};
+
+const getAppBaseUrl = () => {
+  if (typeof window === "undefined") return "";
+  return window.location.origin;
+};
+
+const getSupabaseFunctionBase = () => {
+  const env = (import.meta as any).env;
+  const supabaseUrl = env?.VITE_SUPABASE_URL?.replace(/\/$/, "");
+  const supabaseAnonKey = env?.VITE_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+
+  return {
+    url: `${supabaseUrl}/functions/v1`,
+    anonKey: supabaseAnonKey,
+  };
+};
+
+const parseMetadata = (metadata: unknown): EvaluationJobMetadata => {
+  if (!metadata) {
+    return {};
+  }
+
+  if (typeof metadata === "string") {
+    try {
+      return JSON.parse(metadata) as EvaluationJobMetadata;
+    } catch {
+      return {};
+    }
+  }
+
+  if (typeof metadata === "object") {
+    return metadata as EvaluationJobMetadata;
+  }
+
+  return {};
+};
+
+const parseEvaluationJobRecord = (data: any): EvaluationJob => {
+  const metadata = parseMetadata(data.metadata);
+  const creatives =
+    typeof data.creatives === "string"
+      ? JSON.parse(data.creatives || "[]")
+      : data.creatives || [];
+
+  return {
+    id: data.id,
+    projectId: data.project_id,
+    projectName: data.project_name,
+    platformId: data.platform_id,
+    brandId: metadata.brandId,
+    brandName: metadata.brandName,
+    ruleMode: metadata.ruleMode,
+    sourceType: metadata.sourceType || "single",
+    sourceProjectIds: metadata.sourceProjectIds || [data.project_id].filter(Boolean),
+    workspaceShortId: metadata.workspaceShortId,
+    inputUrl: metadata.inputUrl,
+    status: data.status,
+    totalCreatives: data.total_creatives,
+    analyzedCreatives: data.analyzed_creatives,
+    creatives,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    error: data.error,
+  };
+};
+
+const buildJobMetadata = ({
+  source,
+  brand,
+  ruleMode,
+}: {
+  source: RocketiumSource;
+  brand?: BrandConfig | null;
+  ruleMode: RuleMode;
+}): EvaluationJobMetadata => ({
+  sourceType: source.sourceType,
+  sourceProjectIds: source.projectIds,
+  workspaceShortId: source.workspaceShortId,
+  inputUrl: source.inputUrl,
+  brandId: brand?.id,
+  brandName: brand?.name,
+  ruleMode,
+});
+
+const extractCreativesFromResponse = (
+  data: any,
+  sourceProjectId: string,
+  sourceProjectName?: string
+): EvaluationCreative[] => {
   const extractedCreatives: EvaluationCreative[] = [];
   const seenUrls = new Set<string>();
 
@@ -133,12 +218,15 @@ const extractCreativesFromResponse = (data: any): EvaluationCreative[] => {
             if (dimension.creativeUrl && !seenUrls.has(dimension.creativeUrl)) {
               seenUrls.add(dimension.creativeUrl);
               extractedCreatives.push({
-                id: `${variation.capsuleId || variation._id}-${dimensionKey}`,
+                id: `${sourceProjectId}-${variation.capsuleId || variation._id}-${dimensionKey}`,
                 url: dimension.creativeUrl,
                 name: dimension.name || dimensionKey,
                 dimensionKey,
                 variationId: variation.capsuleId || variation._id,
+                capsuleId: variation.capsuleId,
                 variationName: variation.name,
+                sourceProjectId,
+                sourceProjectName,
                 width: dimension.width,
                 height: dimension.height,
                 status: "pending",
@@ -153,200 +241,139 @@ const extractCreativesFromResponse = (data: any): EvaluationCreative[] => {
   return extractedCreatives;
 };
 
-/**
- * Create a new evaluation job
- * Returns shareable URL immediately while analysis runs in background
- */
-export const createEvaluationJob = async (
-  projectLink: string,
-  platformId: string = "default"
-): Promise<{
-  success: boolean;
-  shareableUrl?: string;
-  jobId?: string;
-  error?: string;
-}> => {
-  try {
-    const projectId = extractProjectIdFromUrl(projectLink);
-    if (!projectId) {
-      return { success: false, error: "Invalid project link" };
+const fetchProjectPayload = async (
+  projectId: string
+): Promise<SourceProjectPayload> => {
+  const baseUrl = getApiBaseUrl();
+  const response = await fetch(
+    `${baseUrl}/api/v2/assetGroup/${projectId}/variations`,
+    {
+      method: "GET",
+      headers: {
+        accept: "application/json, text/plain, */*",
+      },
     }
+  );
 
-    const jobId = generateShareableId();
-    const now = new Date().toISOString();
+  if (!response.ok) {
+    throw new Error(`Failed to fetch project ${projectId}: ${response.status}`);
+  }
 
-    // Fetch project data first
-    const baseUrl = getApiBaseUrl();
-    const response = await fetch(
-      `${baseUrl}/api/v2/assetGroup/${projectId}/variations`,
-      {
-        method: "GET",
-        headers: {
-          accept: "application/json, text/plain, */*",
-        },
-      }
-    );
+  const data = await response.json();
+  const projectName = data.assetGroup?.name || undefined;
+  const creatives = extractCreativesFromResponse(data, projectId, projectName);
 
-    if (!response.ok) {
-      return {
-        success: false,
-        error: `Failed to fetch project: ${response.status}`,
-      };
-    }
+  return {
+    projectId,
+    projectName,
+    creatives,
+  };
+};
 
-    const data = await response.json();
-    const creatives = extractCreativesFromResponse(data);
+const fetchSourceProjects = async (
+  source: RocketiumSource
+): Promise<SourceProjectPayload[]> => {
+  const results: SourceProjectPayload[] = [];
+  const CONCURRENCY_LIMIT = 3;
 
-    if (creatives.length === 0) {
-      return { success: false, error: "No creatives found in project" };
-    }
+  for (let index = 0; index < source.projectIds.length; index += CONCURRENCY_LIMIT) {
+    const batch = source.projectIds.slice(index, index + CONCURRENCY_LIMIT);
+    const batchResults = await Promise.all(batch.map(fetchProjectPayload));
+    results.push(...batchResults);
+  }
 
-    const projectName = data.assetGroup?.name || null;
+  return results;
+};
 
-    // Create initial job record
-    const jobData: EvaluationJob = {
-      id: jobId,
-      projectId,
-      projectName,
-      platformId,
-      status: "pending",
-      totalCreatives: creatives.length,
-      analyzedCreatives: 0,
-      creatives,
-      createdAt: now,
-      updatedAt: now,
-    };
+const createJobRecord = async ({
+  jobId,
+  source,
+  projectName,
+  platform,
+  brand,
+  ruleMode,
+  creatives,
+}: {
+  jobId: string;
+  source: RocketiumSource;
+  projectName?: string;
+  platform: PlatformConfig;
+  brand?: BrandConfig | null;
+  ruleMode: RuleMode;
+  creatives: EvaluationCreative[];
+}) => {
+  const now = new Date().toISOString();
+  const metadata = buildJobMetadata({ source, brand, ruleMode });
 
-    // Save to Supabase
-    const { error: insertError } = await supabase
-      .from("evaluation_jobs")
-      .insert({
-        id: jobId,
-        project_id: projectId,
-        project_name: projectName,
-        platform_id: platformId,
-        status: "pending",
-        total_creatives: creatives.length,
-        analyzed_creatives: 0,
-        creatives: JSON.stringify(creatives),
-        created_at: now,
-        updated_at: now,
-      });
+  const { error } = await supabase.from("evaluation_jobs").insert({
+    id: jobId,
+    project_id: source.projectIds[0],
+    project_name: projectName || null,
+    platform_id: platform.id,
+    status: "pending",
+    total_creatives: creatives.length,
+    analyzed_creatives: 0,
+    creatives: JSON.stringify(creatives),
+    metadata,
+    created_at: now,
+    updated_at: now,
+  });
 
-    if (insertError) {
-      console.error("Failed to create evaluation job:", insertError);
-      return { success: false, error: "Failed to create evaluation job" };
-    }
-
-    // Start background analysis (don't await)
-    runBackgroundAnalysis(jobId, projectId, platformId, creatives, projectName);
-
-    const shareableUrl = `${getAppBaseUrl()}/preview/${jobId}`;
-    return { success: true, shareableUrl, jobId };
-  } catch (error: any) {
-    console.error("Error creating evaluation job:", error);
-    return { success: false, error: error.message };
+  if (error) {
+    throw error;
   }
 };
 
-/**
- * Run analysis in background for all creatives
- */
-const runBackgroundAnalysis = async (
+const updateJobStatus = async (
   jobId: string,
-  projectId: string,
-  platformId: string,
-  creatives: EvaluationCreative[],
-  projectName?: string | null
+  status: EvaluationJob["status"],
+  error?: string
 ) => {
-  try {
-    // Update status to analyzing
-    await updateJobStatus(jobId, "analyzing");
-
-    // Get platform config
-    const platforms = await fetchPlatforms();
-    const platform = platforms.find((p) => p.id === platformId) || platforms[0];
-
-    // Analyze all creatives in parallel (with concurrency limit)
-    const CONCURRENCY_LIMIT = 3;
-    const results: EvaluationCreative[] = [...creatives];
-
-    for (let i = 0; i < creatives.length; i += CONCURRENCY_LIMIT) {
-      const batch = creatives.slice(i, i + CONCURRENCY_LIMIT);
-
-      await Promise.all(
-        batch.map(async (creative, batchIndex) => {
-          const index = i + batchIndex;
-          try {
-            // Update creative status to analyzing
-            results[index] = { ...results[index], status: "analyzing" };
-            await updateJobCreatives(jobId, results, index + 1);
-
-            // Analyze the creative
-            const analyzed = await analyzeCreative(creative, platform);
-            results[index] = analyzed;
-
-            // Update progress
-            await updateJobCreatives(jobId, results, index + 1);
-          } catch (err: any) {
-            console.error(`Failed to analyze creative ${creative.id}:`, err);
-            results[index] = {
-              ...results[index],
-              status: "failed",
-              error: err.message,
-            };
-            await updateJobCreatives(jobId, results, index + 1);
-          }
-        })
-      );
-    }
-
-    // Mark job as completed
-    await updateJobStatus(jobId, "completed");
-
-    // Also save to project_evaluations for persistence
-    const storedCreatives: StoredCreativeResult[] = results
-      .filter((c) => c.complianceResults || c.analysisResult)
-      .map((c) => ({
-        creativeId: c.id,
-        creativeUrl: c.url,
-        creativeName: c.name,
-        dimensionKey: c.dimensionKey,
-        variationId: c.variationId,
-        variationName: c.variationName,
-        width: c.width,
-        height: c.height,
-        analysisResult: c.analysisResult,
-        complianceResults: c.complianceResults,
-        complianceScores: c.complianceScores,
-        analyzedAt: new Date().toISOString(),
-        platformId,
-      }));
-
-    if (storedCreatives.length > 0) {
-      await saveProjectEvaluation(
-        projectId,
-        platformId,
-        storedCreatives,
-        projectName || undefined
-      );
-    }
-  } catch (error: any) {
-    console.error("Background analysis failed:", error);
-    await updateJobStatus(jobId, "failed", error.message);
-  }
+  await supabase
+    .from("evaluation_jobs")
+    .update({
+      status,
+      error,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId);
 };
 
-/**
- * Analyze a single creative
- */
-const analyzeCreative = async (
-  creative: EvaluationCreative,
-  platform: PlatformConfig
-): Promise<EvaluationCreative> => {
+const updateJobCreatives = async (
+  jobId: string,
+  creatives: EvaluationCreative[],
+  analyzedCount: number
+) => {
+  await supabase
+    .from("evaluation_jobs")
+    .update({
+      creatives: JSON.stringify(creatives),
+      analyzed_creatives: analyzedCount,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId);
+};
+
+const analyzeCreative = async ({
+  creative,
+  prompt,
+  rules,
+  promptLayers,
+}: {
+  creative: EvaluationCreative;
+  prompt: string;
+  rules: ComplianceRuleDefinition[];
+  promptLayers?: PromptLayerConfig;
+}): Promise<EvaluationCreative> => {
   try {
-    // Fetch image and convert to base64
-    const imageResponse = await fetch(creative.url);
+    const { visualRules, precisionRules } = partitionRulesByEngine(rules);
+    const imageResponse = await fetch(getFetchableAssetUrl(creative.url));
+    if (!imageResponse.ok) {
+      throw new Error(
+        `Failed to fetch creative ${creative.id}: ${imageResponse.status}`
+      );
+    }
+
     const blob = await imageResponse.blob();
     const reader = new FileReader();
 
@@ -362,23 +389,35 @@ const analyzeCreative = async (
     const base64Data = await base64Promise;
     const mimeType = blob.type || "image/png";
 
-    // Run analysis
     const analysisResult = await analyzeImageWithGemini(
       base64Data,
       mimeType,
-      platform.prompt
+      prompt,
+      promptLayers
     );
 
-    // Run compliance check
     let complianceResults: ComplianceResult[] | undefined;
     let complianceScores: ComplianceScores | undefined;
 
-    if (platform.complianceRules && platform.complianceRules.length > 0) {
+    if (visualRules.length > 0) {
       complianceResults = await checkComplianceWithGemini(
         base64Data,
         mimeType,
-        platform.complianceRules
+        visualRules,
+        promptLayers,
+        analysisResult
       );
+    }
+
+    if (precisionRules.length > 0) {
+      const skippedResults = createPrecisionUnavailableResults(
+        precisionRules,
+        "Fact-based capsule checks are only available through the backend evaluation job path."
+      );
+      complianceResults = [...(complianceResults || []), ...skippedResults];
+    }
+
+    if (complianceResults?.length) {
       complianceScores = calculateComplianceScores(complianceResults);
     }
 
@@ -398,64 +437,269 @@ const analyzeCreative = async (
   }
 };
 
-/**
- * Fetch platforms configuration
- */
-const fetchPlatforms = async (): Promise<PlatformConfig[]> => {
+const runBackgroundAnalysis = async ({
+  jobId,
+  source,
+  platform,
+  brand,
+  ruleMode,
+  rules,
+  creatives,
+  projectName,
+}: {
+  jobId: string;
+  source: RocketiumSource;
+  platform: PlatformConfig;
+  brand?: BrandConfig | null;
+  ruleMode: RuleMode;
+  rules: ComplianceRuleDefinition[];
+  creatives: EvaluationCreative[];
+  projectName?: string;
+}) => {
   try {
-    const res = await fetch("/api/platforms");
-    if (res.ok) {
-      return await res.json();
+    await updateJobStatus(jobId, "analyzing");
+
+    const results: EvaluationCreative[] = [...creatives];
+    const CONCURRENCY_LIMIT = 3;
+
+    for (let index = 0; index < creatives.length; index += CONCURRENCY_LIMIT) {
+      const batch = creatives.slice(index, index + CONCURRENCY_LIMIT);
+
+      await Promise.all(
+        batch.map(async (creative, batchIndex) => {
+          const resultIndex = index + batchIndex;
+
+          results[resultIndex] = { ...results[resultIndex], status: "analyzing" };
+          await updateJobCreatives(jobId, results, resultIndex);
+
+          const analyzed = await analyzeCreative({
+            creative,
+            prompt: platform.prompt,
+            rules,
+            promptLayers: buildPromptLayerConfig({
+              platform,
+              brand,
+              ruleMode,
+            }),
+          });
+
+          results[resultIndex] = analyzed;
+          await updateJobCreatives(jobId, results, resultIndex + 1);
+        })
+      );
     }
-    const staticRes = await fetch("/platforms.json");
-    if (staticRes.ok) {
-      return await staticRes.json();
+
+    await updateJobStatus(jobId, "completed");
+
+    if (source.projectIds.length === 1 && ruleMode === "platform") {
+      const storedCreatives: StoredCreativeResult[] = results
+        .filter((creative) => creative.complianceResults || creative.analysisResult)
+        .map((creative) => ({
+          creativeId: creative.id,
+          creativeUrl: creative.url,
+          creativeName: creative.name,
+          dimensionKey: creative.dimensionKey,
+          variationId: creative.variationId,
+          variationName: creative.variationName,
+          width: creative.width,
+          height: creative.height,
+          analysisResult: creative.analysisResult,
+          complianceResults: creative.complianceResults,
+          complianceScores: creative.complianceScores,
+          analyzedAt: new Date().toISOString(),
+          platformId: platform.id,
+        }));
+
+      if (storedCreatives.length > 0) {
+        await saveProjectEvaluation(
+          source.projectIds[0],
+          platform.id,
+          storedCreatives,
+          projectName
+        );
+      }
     }
-  } catch {
-    // Fall back to defaults
+  } catch (error: any) {
+    console.error("Background analysis failed:", error);
+    await updateJobStatus(jobId, "failed", error.message);
   }
-  return DEFAULT_PLATFORMS;
 };
 
-/**
- * Update job status in database
- */
-const updateJobStatus = async (
-  jobId: string,
-  status: EvaluationJob["status"],
-  error?: string
-) => {
-  await supabase
-    .from("evaluation_jobs")
-    .update({
-      status,
-      error,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", jobId);
+const createEvaluationJobViaFunction = async ({
+  projectLink,
+  platform,
+  brand,
+  ruleMode,
+  rules,
+}: {
+  projectLink: string;
+  platform: PlatformConfig;
+  brand?: BrandConfig | null;
+  ruleMode: RuleMode;
+  rules: ComplianceRuleDefinition[];
+}) => {
+  const functionBase = getSupabaseFunctionBase();
+  if (!functionBase) {
+    throw new Error("Supabase function configuration is missing");
+  }
+
+  const response = await fetch(`${functionBase.url}/create-evaluation`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${functionBase.anonKey}`,
+    },
+    body: JSON.stringify({
+      project_link: projectLink,
+      platform_id: platform.id,
+      platform_prompt: platform.prompt,
+      platform_system_prompt: platform.systemPrompt,
+      brand_id: brand?.id,
+      brand_name: brand?.name,
+      brand_description: brand?.description,
+      brand_system_prompt: brand?.systemPrompt,
+      rule_mode: ruleMode,
+      rules,
+      base_url: getAppBaseUrl(),
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(
+      data.error || `Failed to create evaluation job (${response.status})`
+    );
+  }
+
+  return {
+    success: true,
+    shareableUrl: data.shareable_url as string,
+    jobId: data.job_id as string,
+  };
 };
 
-/**
- * Update job creatives and progress
- */
-const updateJobCreatives = async (
-  jobId: string,
-  creatives: EvaluationCreative[],
-  analyzedCount: number
-) => {
-  await supabase
-    .from("evaluation_jobs")
-    .update({
-      creatives: JSON.stringify(creatives),
-      analyzed_creatives: analyzedCount,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", jobId);
+const createEvaluationJobLocally = async ({
+  projectLink,
+  source,
+  platform,
+  brand,
+  ruleMode,
+  rules,
+}: {
+  projectLink: string;
+  source: RocketiumSource;
+  platform: PlatformConfig;
+  brand?: BrandConfig | null;
+  ruleMode: RuleMode;
+  rules: ComplianceRuleDefinition[];
+}): Promise<{
+  success: boolean;
+  shareableUrl?: string;
+  jobId?: string;
+  error?: string;
+}> => {
+  try {
+    const projectPayloads = await fetchSourceProjects(source);
+    const creatives = projectPayloads.flatMap((payload) => payload.creatives);
+
+    if (creatives.length === 0) {
+      return { success: false, error: "No creatives found in project source" };
+    }
+
+    const projectName =
+      projectPayloads.length === 1
+        ? projectPayloads[0].projectName
+        : `${projectPayloads.length} projects`;
+
+    const jobId = generateShareableId();
+    await createJobRecord({
+      jobId,
+      source,
+      projectName,
+      platform,
+      brand,
+      ruleMode,
+      creatives,
+    });
+
+    void runBackgroundAnalysis({
+      jobId,
+      source,
+      platform,
+      brand,
+      ruleMode,
+      rules,
+      creatives,
+      projectName,
+    });
+
+    return {
+      success: true,
+      shareableUrl: `${getAppBaseUrl()}/preview/${jobId}`,
+      jobId,
+    };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
 };
 
-/**
- * Load evaluation job by ID
- */
+export { extractProjectIdFromUrl };
+
+export const createEvaluationJob = async (
+  projectLink: string,
+  options: CreateEvaluationJobOptions = {}
+): Promise<{
+  success: boolean;
+  shareableUrl?: string;
+  jobId?: string;
+  error?: string;
+}> => {
+  try {
+    const source = parseRocketiumSource(projectLink);
+    if (!source) {
+      return { success: false, error: "Invalid Rocketium project link" };
+    }
+
+    const platform = options.platform || DEFAULT_PLATFORMS[0];
+    const ruleMode = options.ruleMode || "platform";
+    const brand = options.brand || null;
+
+    if ((ruleMode === "brand" || ruleMode === "combined") && !brand) {
+      return { success: false, error: "Please select a brand rule set." };
+    }
+
+    const rules = buildEvaluationRules({ platform, brand, ruleMode });
+
+    try {
+      return await createEvaluationJobViaFunction({
+        projectLink,
+        platform,
+        brand,
+        ruleMode,
+        rules,
+      });
+    } catch (functionError) {
+      console.warn(
+        "Falling back to local evaluation job creation:",
+        functionError
+      );
+
+      return await createEvaluationJobLocally({
+        projectLink,
+        source,
+        platform,
+        brand,
+        ruleMode,
+        rules,
+      });
+    }
+  } catch (error: any) {
+    console.error("Error creating evaluation job:", error);
+    return { success: false, error: error.message };
+  }
+};
+
 export const loadEvaluationJob = async (
   jobId: string
 ): Promise<{ success: boolean; data?: EvaluationJob; error?: string }> => {
@@ -473,36 +717,13 @@ export const loadEvaluationJob = async (
       throw error;
     }
 
-    if (data) {
-      const job: EvaluationJob = {
-        id: data.id,
-        projectId: data.project_id,
-        projectName: data.project_name,
-        platformId: data.platform_id,
-        status: data.status,
-        totalCreatives: data.total_creatives,
-        analyzedCreatives: data.analyzed_creatives,
-        creatives:
-          typeof data.creatives === "string"
-            ? JSON.parse(data.creatives || "[]")
-            : data.creatives || [],
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        error: data.error,
-      };
-      return { success: true, data: job };
-    }
-
-    return { success: false, error: "Evaluation not found" };
+    return { success: true, data: parseEvaluationJobRecord(data) };
   } catch (error: any) {
     console.error("Error loading evaluation job:", error);
     return { success: false, error: error.message };
   }
 };
 
-/**
- * Subscribe to real-time updates for an evaluation job
- */
 export const subscribeToJobUpdates = (
   jobId: string,
   onUpdate: (job: EvaluationJob) => void
@@ -518,24 +739,7 @@ export const subscribeToJobUpdates = (
         filter: `id=eq.${jobId}`,
       },
       (payload) => {
-        const data = payload.new as any;
-        const job: EvaluationJob = {
-          id: data.id,
-          projectId: data.project_id,
-          projectName: data.project_name,
-          platformId: data.platform_id,
-          status: data.status,
-          totalCreatives: data.total_creatives,
-          analyzedCreatives: data.analyzed_creatives,
-          creatives:
-            typeof data.creatives === "string"
-              ? JSON.parse(data.creatives || "[]")
-              : data.creatives || [],
-          createdAt: data.created_at,
-          updatedAt: data.updated_at,
-          error: data.error,
-        };
-        onUpdate(job);
+        onUpdate(parseEvaluationJobRecord(payload.new));
       }
     )
     .subscribe();
@@ -545,41 +749,30 @@ export const subscribeToJobUpdates = (
   };
 };
 
-/**
- * Update a creative's attention result in an evaluation job
- * Uses Edge Function to bypass CORS restrictions
- */
 export const updateJobCreativeAttention = async (
   jobId: string,
   creativeId: string,
   attentionResult: AttentionInsightResult
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    // Get Supabase URL from environment (using type assertion for Vite)
-    const env = (import.meta as any).env;
-    const supabaseUrl = env?.VITE_SUPABASE_URL;
-    const supabaseAnonKey = env?.VITE_SUPABASE_ANON_KEY;
+    const functionBase = getSupabaseFunctionBase();
 
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!functionBase) {
       throw new Error("Missing Supabase environment variables");
     }
 
-    // Call the Edge Function
-    const response = await fetch(
-      `${supabaseUrl}/functions/v1/update-attention`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${supabaseAnonKey}`,
-        },
-        body: JSON.stringify({
-          job_id: jobId,
-          creative_id: creativeId,
-          attention_result: attentionResult,
-        }),
-      }
-    );
+    const response = await fetch(`${functionBase.url}/update-attention`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${functionBase.anonKey}`,
+      },
+      body: JSON.stringify({
+        job_id: jobId,
+        creative_id: creativeId,
+        attention_result: attentionResult,
+      }),
+    });
 
     const data = await response.json();
 

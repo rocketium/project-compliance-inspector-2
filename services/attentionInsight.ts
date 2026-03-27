@@ -4,6 +4,8 @@
  * API Docs: https://ext-api.attentioninsight.com/api/v2/studies
  */
 
+import { getFetchableAssetUrl } from "../lib/assetProxy";
+
 export interface AttentionArea {
   x: number; // percentage 0-100
   y: number; // percentage 0-100
@@ -85,7 +87,7 @@ export const analyzeWithAttentionInsight = async (
     const apiKey = getApiKey();
 
     // Fetch the image and convert to blob
-    const imageResponse = await fetch(imageUrl);
+    const imageResponse = await fetch(getFetchableAssetUrl(imageUrl));
     const imageBlob = await imageResponse.blob();
 
     // Extract filename from URL

@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 import { ZoomPanControls } from "./ZoomPanControls";
+import { groupResultsByCheckType, groupResultsByEngineAndCheckType } from "../lib/ruleBundle";
 
 // Theme toggle button
 const ThemeToggle: React.FC = () => {
@@ -143,6 +144,10 @@ export const EvaluationPreview: React.FC = () => {
     "dashboard"
   );
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [ruleSourceFilter, setRuleSourceFilter] = useState<
+    "all" | "platform" | "brand"
+  >("all");
+  const [selectedSourceProjectId, setSelectedSourceProjectId] = useState("all");
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
 
   // Attention Insight state
@@ -287,6 +292,74 @@ export const EvaluationPreview: React.FC = () => {
     [job, selectedCreativeId]
   );
 
+  const sourceProjectOptions = useMemo(() => {
+    if (!job) return [];
+    const seen = new Map<string, string>();
+    job.creatives.forEach((creative) => {
+      if (creative.sourceProjectId) {
+        seen.set(
+          creative.sourceProjectId,
+          creative.sourceProjectName || creative.sourceProjectId
+        );
+      }
+    });
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+  }, [job]);
+
+  const visibleCreatives = useMemo(() => {
+    if (!job) return [];
+    if (selectedSourceProjectId === "all") return job.creatives;
+    return job.creatives.filter(
+      (creative) => creative.sourceProjectId === selectedSourceProjectId
+    );
+  }, [job, selectedSourceProjectId]);
+
+  const groupedVisibleCreatives = useMemo(() => {
+    const grouped = new Map<string, typeof visibleCreatives>();
+    visibleCreatives.forEach((creative) => {
+      const key = creative.sourceProjectId || "unknown";
+      const bucket = grouped.get(key) || [];
+      bucket.push(creative);
+      grouped.set(key, bucket);
+    });
+    return Array.from(grouped.entries()).map(([sourceProjectId, creatives]) => ({
+      sourceProjectId,
+      sourceProjectName:
+        creatives[0]?.sourceProjectName || creatives[0]?.sourceProjectId || "Project",
+      creatives,
+    }));
+  }, [visibleCreatives]);
+
+  const groupedFilteredResults = useMemo(() => {
+    if (!selectedCreative?.complianceResults) return [];
+    return groupResultsByEngineAndCheckType(
+      selectedCreative.complianceResults.filter((result) => {
+        const matchesStatus =
+          filterStatus === "all" || result.status === filterStatus.toUpperCase();
+        const matchesRuleSource =
+          ruleSourceFilter === "all" || result.ruleSource === ruleSourceFilter;
+        return matchesStatus && matchesRuleSource;
+      })
+    );
+  }, [selectedCreative, filterStatus, ruleSourceFilter]);
+
+  useEffect(() => {
+    if (sourceProjectOptions.length <= 1 && selectedSourceProjectId !== "all") {
+      setSelectedSourceProjectId("all");
+    }
+  }, [sourceProjectOptions.length, selectedSourceProjectId]);
+
+  useEffect(() => {
+    if (!visibleCreatives.length) {
+      setSelectedCreativeId(null);
+      return;
+    }
+
+    if (!visibleCreatives.some((creative) => creative.id === selectedCreativeId)) {
+      setSelectedCreativeId(visibleCreatives[0].id);
+    }
+  }, [visibleCreatives, selectedCreativeId]);
+
   // Check if selected creative is the first one (only first creative has attention analysis)
   const isFirstCreative = useMemo(
     () =>
@@ -414,8 +487,13 @@ export const EvaluationPreview: React.FC = () => {
 
   // Get filtered results
   const getFilteredResults = (results: ComplianceResult[]) => {
-    if (filterStatus === "all") return results;
-    return results.filter((r) => r.status === filterStatus.toUpperCase());
+    return results.filter((result) => {
+      const matchesStatus =
+        filterStatus === "all" || result.status === filterStatus.toUpperCase();
+      const matchesRuleSource =
+        ruleSourceFilter === "all" || result.ruleSource === ruleSourceFilter;
+      return matchesStatus && matchesRuleSource;
+    });
   };
 
   // Toggle expand for compliance item
@@ -537,30 +615,39 @@ export const EvaluationPreview: React.FC = () => {
     <div className="h-screen max-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900 flex flex-col transition-colors overflow-hidden text-[13px]">
       {/* Header */}
       <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 flex-shrink-0 z-30">
-        <div className="max-w-full mx-auto px-4 h-12 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-full mx-auto px-4 py-2.5 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
             <button
               onClick={() => navigate("/")}
-              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+              className="mt-0.5 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
             >
               <ArrowLeft size={16} />
             </button>
-            <div className="flex items-center gap-2">
-              <div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-1.5 rounded-lg shadow-md shadow-indigo-500/20">
+            <div className="flex items-start gap-2 min-w-0">
+              <div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-1.5 rounded-lg shadow-md shadow-indigo-500/20 mt-0.5">
                 <Layers className="text-white h-4 w-4" />
               </div>
-              <div>
-                <h1 className="text-sm font-semibold text-slate-900 dark:text-white tracking-tight leading-tight">
+              <div className="min-w-0">
+                <h1 className="text-sm font-semibold text-slate-900 dark:text-white tracking-tight leading-tight truncate">
                   {job.projectName || "Project Evaluation"}
                 </h1>
-                <p className="text-[10px] text-slate-500 dark:text-slate-500 font-mono leading-tight">
+                <p className="text-[10px] text-slate-500 dark:text-slate-500 font-mono leading-tight truncate">
                   {job.projectId}
+                </p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-500 leading-tight truncate">
+                  {job.sourceProjectIds.length > 1
+                    ? `${job.sourceProjectIds.length} projects`
+                    : "1 project"}
+                  {job.workspaceShortId
+                    ? ` · Workspace ${job.workspaceShortId}`
+                    : ""}
+                  {job.brandName ? ` · ${job.brandName}` : ""}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {/* Job Status */}
             <div className="flex items-center gap-3 px-3 py-1.5 bg-slate-100/80 dark:bg-slate-800/50 rounded-xl backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50">
               {job.status === "analyzing" || job.status === "pending" ? (
@@ -673,78 +760,101 @@ export const EvaluationPreview: React.FC = () => {
                 ({job.totalCreatives})
               </span>
             </h2>
+            {sourceProjectOptions.length > 1 && (
+              <select
+                value={selectedSourceProjectId}
+                onChange={(e) => setSelectedSourceProjectId(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-[11px] text-slate-700 dark:text-slate-200"
+              >
+                <option value="all">All Source Projects</option>
+                {sourceProjectOptions.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-            {job.creatives.map((creative) => (
-              <button
-                key={creative.id}
-                onClick={() => setSelectedCreativeId(creative.id)}
-                className={`w-full text-left p-2 rounded-xl border transition-all duration-200 group ${
-                  selectedCreativeId === creative.id
-                    ? "border-indigo-300 dark:border-indigo-600 bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-900/30 dark:to-violet-900/30 shadow-md shadow-indigo-100 dark:shadow-indigo-900/20"
-                    : "border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/50 bg-white/80 dark:bg-slate-800/30"
-                }`}
-              >
-                <div className="flex gap-2">
-                  <div className="w-12 h-12 flex-shrink-0 bg-slate-100 dark:bg-slate-700 rounded-lg overflow-hidden ring-1 ring-slate-200/50 dark:ring-slate-600/50">
-                    <img
-                      src={creative.url}
-                      alt={creative.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Crect width='48' height='48' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='8'%3ENo Image%3C/text%3E%3C/svg%3E";
-                      }}
-                    />
+            {groupedVisibleCreatives.map((group) => (
+              <div key={group.sourceProjectId} className="space-y-1.5">
+                {sourceProjectOptions.length > 1 && (
+                  <div className="px-1 text-[10px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400">
+                    {group.sourceProjectName}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-slate-800 dark:text-slate-100 truncate leading-tight">
-                      {creative.name}
-                    </p>
-                    {creative.variationName && (
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate leading-tight">
-                        {creative.variationName}
-                      </p>
-                    )}
-                    {creative.width && creative.height && (
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono leading-tight">
-                        {creative.width}×{creative.height}
-                      </p>
-                    )}
-                    <div className="mt-1 flex items-center gap-1 flex-wrap">
-                      {creative.status === "analyzing" && (
-                        <span className="flex items-center gap-0.5 text-[9px] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-px rounded-full font-medium">
-                          <Loader2 size={8} className="animate-spin" />
-                          Analyzing
-                        </span>
-                      )}
-                      {creative.status === "pending" && (
-                        <span className="text-[9px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-px rounded-full font-medium">
-                          Pending
-                        </span>
-                      )}
-                      {creative.complianceScores && (
-                        <span
-                          className={`text-[9px] font-bold px-1.5 py-px rounded-full ${
-                            creative.complianceScores.overall >= 80
-                              ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-                              : creative.complianceScores.overall >= 60
-                              ? "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
-                              : "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400"
-                          }`}
-                        >
-                          {creative.complianceScores.overall}%
-                        </span>
-                      )}
-                      {creative.status === "failed" && (
-                        <span className="text-[9px] text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 px-1.5 py-px rounded-full font-medium">
-                          Error
-                        </span>
-                      )}
+                )}
+                {group.creatives.map((creative) => (
+                  <button
+                    key={creative.id}
+                    onClick={() => setSelectedCreativeId(creative.id)}
+                    className={`w-full text-left p-2 rounded-xl border transition-all duration-200 group ${
+                      selectedCreativeId === creative.id
+                        ? "border-indigo-300 dark:border-indigo-600 bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-900/30 dark:to-violet-900/30 shadow-md shadow-indigo-100 dark:shadow-indigo-900/20"
+                        : "border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/50 bg-white/80 dark:bg-slate-800/30"
+                    }`}
+                  >
+                    <div className="flex gap-2">
+                      <div className="w-12 h-12 flex-shrink-0 bg-slate-100 dark:bg-slate-700 rounded-lg overflow-hidden ring-1 ring-slate-200/50 dark:ring-slate-600/50">
+                        <img
+                          src={creative.url}
+                          alt={creative.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Crect width='48' height='48' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='8'%3ENo Image%3C/text%3E%3C/svg%3E";
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-slate-800 dark:text-slate-100 truncate leading-tight">
+                          {creative.name}
+                        </p>
+                        {creative.variationName && (
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate leading-tight">
+                            {creative.variationName}
+                          </p>
+                        )}
+                        {creative.width && creative.height && (
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono leading-tight">
+                            {creative.width}×{creative.height}
+                          </p>
+                        )}
+                        <div className="mt-1 flex items-center gap-1 flex-wrap">
+                          {creative.status === "analyzing" && (
+                            <span className="flex items-center gap-0.5 text-[9px] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-px rounded-full font-medium">
+                              <Loader2 size={8} className="animate-spin" />
+                              Analyzing
+                            </span>
+                          )}
+                          {creative.status === "pending" && (
+                            <span className="text-[9px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-px rounded-full font-medium">
+                              Pending
+                            </span>
+                          )}
+                          {creative.complianceScores && (
+                            <span
+                              className={`text-[9px] font-bold px-1.5 py-px rounded-full ${
+                                creative.complianceScores.overall >= 80
+                                  ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                                  : creative.complianceScores.overall >= 60
+                                  ? "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                                  : "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400"
+                              }`}
+                            >
+                              {creative.complianceScores.overall}%
+                            </span>
+                          )}
+                          {creative.status === "failed" && (
+                            <span className="text-[9px] text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 px-1.5 py-px rounded-full font-medium">
+                              Error
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </button>
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
         </div>
@@ -761,6 +871,11 @@ export const EvaluationPreview: React.FC = () => {
                   {selectedCreative.variationName && (
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
                       {selectedCreative.variationName}
+                    </p>
+                  )}
+                  {selectedCreative.sourceProjectName && (
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                      {selectedCreative.sourceProjectName}
                     </p>
                   )}
                 </div>
@@ -1560,124 +1675,175 @@ export const EvaluationPreview: React.FC = () => {
                               </button>
                             );
                           })}
+                          <select
+                            value={ruleSourceFilter}
+                            onChange={(e) =>
+                              setRuleSourceFilter(
+                                e.target.value as "all" | "platform" | "brand"
+                              )
+                            }
+                            className="ml-auto rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1 text-[10px] text-slate-600 dark:text-slate-300"
+                          >
+                            <option value="all">All Sources</option>
+                            <option value="platform">Platform Rules</option>
+                            <option value="brand">Brand Rules</option>
+                          </select>
                         </div>
 
                         <div className="overflow-y-auto p-2.5 space-y-2 flex-1 min-h-0">
-                          {getFilteredResults(
-                            selectedCreative.complianceResults!
-                          ).map((res, idx) => {
-                            const originalIndex =
-                              selectedCreative.complianceResults!.indexOf(res);
-                            const isExpanded = expandedItems.has(originalIndex);
-
-                            return (
-                              <div
-                                key={idx}
-                                className={`rounded-xl border transition-all duration-200 overflow-hidden ${
-                                  res.status === "FAIL"
-                                    ? "border-rose-200 dark:border-rose-800/50 bg-gradient-to-br from-rose-50/50 to-white dark:from-rose-900/10 dark:to-slate-800/50"
-                                    : res.status === "WARNING"
-                                    ? "border-amber-200 dark:border-amber-800/50 bg-gradient-to-br from-amber-50/50 to-white dark:from-amber-900/10 dark:to-slate-800/50"
-                                    : "border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-600"
-                                }`}
-                              >
+                          {groupedFilteredResults.length === 0 && (
+                            <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 px-3 py-6 text-center text-[11px] text-slate-500 dark:text-slate-400">
+                              No rules match the current filters.
+                            </div>
+                          )}
+                          {groupedFilteredResults.map((engineGroup) => (
+                            <div key={engineGroup.engine} className="space-y-3">
+                              <div className="px-1 text-[10px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400">
+                                {engineGroup.label}
+                              </div>
+                              {engineGroup.groups.map((group) => (
                                 <div
-                                  className="p-2.5 cursor-pointer"
-                                  onClick={() => toggleExpand(originalIndex)}
+                                  key={`${engineGroup.engine}-${group.checkType}`}
+                                  className="space-y-2"
                                 >
-                                  <div className="flex gap-2 items-start">
-                                    <div className="mt-px flex-shrink-0">
-                                      {res.status === "PASS" && (
-                                        <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                                          <CheckCircle2
-                                            className="text-emerald-500"
-                                            size={12}
-                                          />
-                                        </div>
-                                      )}
-                                      {res.status === "FAIL" && (
-                                        <div className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
-                                          <XCircle
-                                            className="text-rose-500"
-                                            size={12}
-                                          />
-                                        </div>
-                                      )}
-                                      {res.status === "WARNING" && (
-                                        <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                                          <AlertTriangle
-                                            className="text-amber-500"
-                                            size={12}
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-1 mb-1 flex-wrap">
-                                        {getCategoryBadge(res.category)}
-                                        {getSeverityBadge(res.severity)}
-                                      </div>
-                                      <p
-                                        className={`text-[11px] font-medium leading-snug ${
+                                  <div className="px-1 text-[10px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400">
+                                    {group.checkType}
+                                  </div>
+                                  {group.results.map((res, idx) => {
+                                    const originalIndex =
+                                      selectedCreative.complianceResults!.indexOf(res);
+                                    const isExpanded = expandedItems.has(originalIndex);
+
+                                    return (
+                                      <div
+                                        key={`${group.checkType}-${idx}-${res.ruleId || res.rule}-${engineGroup.engine}`}
+                                        className={`rounded-xl border transition-all duration-200 overflow-hidden ${
                                           res.status === "FAIL"
-                                            ? "text-rose-900 dark:text-rose-200"
-                                            : "text-slate-800 dark:text-slate-200"
+                                            ? "border-rose-200 dark:border-rose-800/50 bg-gradient-to-br from-rose-50/50 to-white dark:from-rose-900/10 dark:to-slate-800/50"
+                                            : res.status === "WARNING"
+                                            ? "border-amber-200 dark:border-amber-800/50 bg-gradient-to-br from-amber-50/50 to-white dark:from-amber-900/10 dark:to-slate-800/50"
+                                            : "border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-600"
                                         }`}
                                       >
-                                        {res.rule}
-                                      </p>
-                                    </div>
-                                    <div className="flex items-center flex-shrink-0">
-                                      {isExpanded ? (
-                                        <ChevronUp
-                                          size={14}
-                                          className="text-slate-400"
-                                        />
-                                      ) : (
-                                        <ChevronDown
-                                          size={14}
-                                          className="text-slate-400"
-                                        />
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {isExpanded && (
-                                  <div className="px-2.5 pb-2.5 pt-0 border-t border-slate-100 dark:border-slate-700/50">
-                                    <div className="mt-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2">
-                                      <p className="text-[9px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                                        Analysis
-                                      </p>
-                                      <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                                        {res.reasoning}
-                                      </p>
-                                    </div>
-
-                                    {res.suggestion &&
-                                      res.status !== "PASS" && (
-                                        <div className="mt-2 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-lg p-2 border border-amber-100 dark:border-amber-800/30">
-                                          <div className="flex items-start gap-1.5">
-                                            <Lightbulb
-                                              size={11}
-                                              className="text-amber-500 flex-shrink-0 mt-0.5"
-                                            />
-                                            <div className="flex-1">
-                                              <p className="text-[9px] uppercase tracking-wider font-semibold text-amber-700 dark:text-amber-400 mb-0.5">
-                                                How to Fix
+                                        <div
+                                          className="p-2.5 cursor-pointer"
+                                          onClick={() => toggleExpand(originalIndex)}
+                                        >
+                                          <div className="flex gap-2 items-start">
+                                            <div className="mt-px flex-shrink-0">
+                                              {res.status === "PASS" && (
+                                                <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                                                  <CheckCircle2 className="text-emerald-500" size={12} />
+                                                </div>
+                                              )}
+                                              {res.status === "FAIL" && (
+                                                <div className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
+                                                  <XCircle className="text-rose-500" size={12} />
+                                                </div>
+                                              )}
+                                              {res.status === "WARNING" && (
+                                                <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                                  <AlertTriangle className="text-amber-500" size={12} />
+                                                </div>
+                                              )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                              <div className="flex items-center gap-1 mb-1 flex-wrap">
+                                                {res.engine !== "precision" &&
+                                                  getCategoryBadge(res.category)}
+                                                {getSeverityBadge(res.severity)}
+                                                {res.ruleSource && (
+                                                  <span className="text-[9px] font-semibold px-1.5 py-px rounded-full bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-300 border border-slate-200/50 dark:border-slate-600/50 capitalize">
+                                                    {res.ruleSource}
+                                                  </span>
+                                                )}
+                                                <span className="text-[9px] font-semibold px-1.5 py-px rounded-full bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-300 border border-slate-200/50 dark:border-slate-600/50 capitalize">
+                                                  {res.engine === "precision"
+                                                    ? "fact-based"
+                                                    : "visual"}
+                                                </span>
+                                              </div>
+                                              <p
+                                                className={`text-[11px] font-medium leading-snug ${
+                                                  res.status === "FAIL"
+                                                    ? "text-rose-900 dark:text-rose-200"
+                                                    : "text-slate-800 dark:text-slate-200"
+                                                }`}
+                                              >
+                                                {res.ruleTitle || res.rule}
                                               </p>
-                                              <p className="text-[11px] text-amber-900 dark:text-amber-200 leading-relaxed">
-                                                {res.suggestion}
-                                              </p>
+                                            </div>
+                                            <div className="flex items-center flex-shrink-0">
+                                              {isExpanded ? (
+                                                <ChevronUp size={14} className="text-slate-400" />
+                                              ) : (
+                                                <ChevronDown size={14} className="text-slate-400" />
+                                              )}
                                             </div>
                                           </div>
                                         </div>
-                                      )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+
+                                        {isExpanded && (
+                                          <div className="px-2.5 pb-2.5 pt-0 border-t border-slate-100 dark:border-slate-700/50">
+                                            <div className="mt-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2">
+                                              <p className="text-[9px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                                                Analysis
+                                              </p>
+                                              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                                                {res.reasoning}
+                                              </p>
+                                            </div>
+
+                                            {res.engine === "precision" &&
+                                              (res.matchedLayerName ||
+                                                res.actualValue !== undefined ||
+                                                res.expectedValue !== undefined) && (
+                                                <div className="mt-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2">
+                                                  <p className="text-[9px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                                                    Fact Details
+                                                  </p>
+                                                  <div className="space-y-1 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                                                    {res.matchedLayerName && (
+                                                      <p>Layer: {res.matchedLayerName}</p>
+                                                    )}
+                                                    {res.actualValue !== undefined && (
+                                                      <p>Actual: {String(res.actualValue)}</p>
+                                                    )}
+                                                    {res.expectedValue !== undefined && (
+                                                      <p>Expected: {String(res.expectedValue)}</p>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                            {res.suggestion &&
+                                              res.status !== "PASS" && (
+                                                <div className="mt-2 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-lg p-2 border border-amber-100 dark:border-amber-800/30">
+                                                  <div className="flex items-start gap-1.5">
+                                                    <Lightbulb
+                                                      size={11}
+                                                      className="text-amber-500 flex-shrink-0 mt-0.5"
+                                                    />
+                                                    <div className="flex-1">
+                                                      <p className="text-[9px] uppercase tracking-wider font-semibold text-amber-700 dark:text-amber-400 mb-0.5">
+                                                        How to Fix
+                                                      </p>
+                                                      <p className="text-[11px] text-amber-900 dark:text-amber-200 leading-relaxed">
+                                                        {res.suggestion}
+                                                      </p>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
                         </div>
                       </>
                     )}

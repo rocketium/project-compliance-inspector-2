@@ -1,132 +1,120 @@
-import { MongoClient, ObjectId } from "npm:mongodb@6.16.0";
+const CAPSULE_EXPORT_URL =
+  "https://api.rocketium.com/api/v1/canvas/exported-capsules";
+const CAPSULE_BATCH_SIZE = 50;
 
-const COLLECTION_NAME = "capsules";
+interface CapsuleAuth {
+  userId: string;
+  sessionId: string;
+}
 
-let cachedClient: MongoClient | null = null;
-let cachedDbName: string | null = null;
-
-const getMongoDbName = (uri: string) => {
-  if (cachedDbName) {
-    return cachedDbName;
-  }
-
-  const explicitDbName = Deno.env.get("MONGODB_DB_NAME")?.trim();
-  if (explicitDbName) {
-    cachedDbName = explicitDbName;
-    return cachedDbName;
-  }
-
-  try {
-    const parsed = new URL(uri);
-    const pathDbName = parsed.pathname.replace(/^\//, "").trim();
-    if (pathDbName) {
-      cachedDbName = pathDbName;
-      return cachedDbName;
-    }
-  } catch {
-    // Fall through to the default database name below.
-  }
-
-  cachedDbName = "rocketium_2";
-  return cachedDbName;
+const PROJECTION = {
+  canvasData: 1,
+  savedCustomDimensions: 1,
+  capsuleId: 1,
+  outputFormat: 1,
+  name: 1,
 };
 
-const toPlainJson = (value: unknown) =>
-  JSON.parse(
-    JSON.stringify(value, (_key, currentValue) => {
-      if (
-        currentValue &&
-        typeof currentValue === "object" &&
-        currentValue.constructor?.name === "ObjectId"
-      ) {
-        return currentValue.toString();
-      }
-
-      return currentValue;
-    })
-  ) as Record<string, unknown>;
-
 const normalizeCapsuleDocument = (doc: Record<string, unknown>) =>
-  toPlainJson(doc);
+  JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
 
-const loadCapsuleFromProxy = async (capsuleId: string) => {
-  const baseUrl = Deno.env.get("CAPSULE_LOOKUP_BASE_URL")?.trim();
-  if (!baseUrl) {
-    return null;
+const parseCapsulePayload = (payload: unknown): Record<string, unknown>[] => {
+  if (Array.isArray(payload)) {
+    return payload.filter(
+      (item): item is Record<string, unknown> =>
+        Boolean(item) && typeof item === "object"
+    );
   }
 
-  const proxyToken = Deno.env.get("CAPSULE_LOOKUP_TOKEN")?.trim();
-  const response = await fetch(
-    `${baseUrl.replace(/\/$/, "")}/api/capsules/${encodeURIComponent(capsuleId)}`,
-    {
-      headers: proxyToken ? { "x-capsule-proxy-key": proxyToken } : undefined,
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+
+  const record = payload as Record<string, unknown>;
+  const candidates = [
+    record.capsules,
+    record.data,
+    record.results,
+    record.exportedCapsules,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === "object"
+      );
     }
-  );
-
-  if (response.status === 404) {
-    return null;
   }
+
+  return [];
+};
+
+const getCapsuleDocumentKeys = (doc: Record<string, unknown>) =>
+  [doc.capsuleId, doc._id, doc.id]
+    .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
+    .map((value) => value.trim());
+
+const fetchCapsuleBatch = async (
+  capsuleIds: string[],
+  auth: CapsuleAuth
+): Promise<Record<string, unknown>[]> => {
+  if (capsuleIds.length === 0) {
+    return [];
+  }
+
+  const response = await fetch(CAPSULE_EXPORT_URL, {
+    method: "POST",
+    headers: {
+      accept: "application/json, text/plain, */*",
+      "content-type": "application/json",
+      origin: "https://rocketium.com",
+      referer: "https://rocketium.com/",
+      requestid: crypto.randomUUID(),
+      sessionid: auth.sessionId,
+      userid: auth.userId,
+    },
+    body: JSON.stringify({
+      capsuleIds,
+      projection: PROJECTION,
+    }),
+  });
 
   if (!response.ok) {
-    throw new Error(`Capsule proxy lookup failed (${response.status})`);
+    throw new Error(`Capsule export lookup failed (${response.status})`);
   }
 
   const payload = await response.json();
-  const capsule =
-    payload?.capsule && typeof payload.capsule === "object"
-      ? payload.capsule
-      : payload && typeof payload === "object"
-      ? payload
-      : null;
-
-  return capsule ? (capsule as Record<string, unknown>) : null;
+  return parseCapsulePayload(payload);
 };
 
-const getMongoClient = async () => {
-  if (cachedClient) {
-    return cachedClient;
+export const loadCapsuleDocuments = async (
+  capsuleIds: string[],
+  auth: CapsuleAuth
+): Promise<Map<string, Record<string, unknown>>> => {
+  const normalizedIds = Array.from(
+    new Set(capsuleIds.map((item) => item.trim()).filter(Boolean))
+  );
+  const capsules = new Map<string, Record<string, unknown>>();
+
+  for (let index = 0; index < normalizedIds.length; index += CAPSULE_BATCH_SIZE) {
+    const batch = normalizedIds.slice(index, index + CAPSULE_BATCH_SIZE);
+    const docs = await fetchCapsuleBatch(batch, auth);
+    docs.forEach((doc) => {
+      const normalized = normalizeCapsuleDocument(doc);
+      getCapsuleDocumentKeys(doc).forEach((docId) => {
+        capsules.set(docId, normalized);
+      });
+    });
   }
 
-  const uri = Deno.env.get("MONGODB_URI");
-  if (!uri) {
-    throw new Error("Missing MONGODB_URI environment variable");
-  }
-
-  const client = new MongoClient(uri);
-  await client.connect();
-  cachedClient = client;
-  return client;
+  return capsules;
 };
 
 export const loadCapsuleDocument = async (
-  capsuleId: string
+  capsuleId: string,
+  auth: CapsuleAuth
 ): Promise<Record<string, unknown> | null> => {
-  const proxyHit = await loadCapsuleFromProxy(capsuleId);
-  if (proxyHit) {
-    return normalizeCapsuleDocument(proxyHit);
-  }
-
-  const uri = Deno.env.get("MONGODB_URI");
-  if (!uri) {
-    return null;
-  }
-
-  const client = await getMongoClient();
-  const collection = client
-    .db(getMongoDbName(uri))
-    .collection(COLLECTION_NAME);
-
-  const byCapsuleId = await collection.findOne({ capsuleId });
-  if (byCapsuleId) {
-    return normalizeCapsuleDocument(byCapsuleId as Record<string, unknown>);
-  }
-
-  if (ObjectId.isValid(capsuleId)) {
-    const byObjectId = await collection.findOne({ _id: new ObjectId(capsuleId) });
-    if (byObjectId) {
-      return normalizeCapsuleDocument(byObjectId as Record<string, unknown>);
-    }
-  }
-
-  return null;
+  const docs = await loadCapsuleDocuments([capsuleId], auth);
+  return docs.get(capsuleId) || null;
 };

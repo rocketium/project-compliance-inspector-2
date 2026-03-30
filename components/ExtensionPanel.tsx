@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
@@ -47,10 +47,16 @@ const getCreativeFailCount = (creative: EvaluationCreative) =>
 export const ExtensionPanel: React.FC = () => {
   const [searchParams] = useSearchParams();
   const sourceUrl = searchParams.get("source") || "";
+  const [rocketiumIdentity, setRocketiumIdentity] = useState(() => ({
+    rocketiumUserId: searchParams.get("rocketiumUserId") || "",
+    rocketiumSessionId: searchParams.get("rocketiumSessionId") || "",
+  }));
   const parsedSource = useMemo(
     () => parseRocketiumSource(sourceUrl),
     [sourceUrl]
   );
+  const rocketiumUserId = rocketiumIdentity.rocketiumUserId;
+  const rocketiumSessionId = rocketiumIdentity.rocketiumSessionId;
 
   const [brands, setBrands] = useState<BrandConfig[]>([]);
   const [activeBrandId, setActiveBrandId] = useState("");
@@ -73,6 +79,64 @@ export const ExtensionPanel: React.FC = () => {
   const [isCreatingJob, setIsCreatingJob] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
+
+  const requestRocketiumIdentity = useCallback(async () => {
+    if (typeof window === "undefined" || window.parent === window) {
+      return {
+        rocketiumUserId: "",
+        rocketiumSessionId: "",
+      };
+    }
+
+    return await new Promise<{
+      rocketiumUserId: string;
+      rocketiumSessionId: string;
+    }>((resolve) => {
+      let settled = false;
+
+      const cleanup = () => {
+        window.removeEventListener("message", handleMessage);
+      };
+
+      const finish = (identity: {
+        rocketiumUserId: string;
+        rocketiumSessionId: string;
+      }) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(identity);
+      };
+
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type !== "rocketium-review:identity") {
+          return;
+        }
+
+        finish({
+          rocketiumUserId:
+            typeof event.data.rocketiumUserId === "string"
+              ? event.data.rocketiumUserId.trim()
+              : "",
+          rocketiumSessionId:
+            typeof event.data.rocketiumSessionId === "string"
+              ? event.data.rocketiumSessionId.trim()
+              : "",
+        });
+      };
+
+      window.addEventListener("message", handleMessage);
+      window.parent.postMessage({ type: "rocketium-review:request-identity" }, "*");
+      window.setTimeout(
+        () =>
+          finish({
+            rocketiumUserId: "",
+            rocketiumSessionId: "",
+          }),
+        3000
+      );
+    });
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -102,6 +166,24 @@ export const ExtensionPanel: React.FC = () => {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (rocketiumUserId && rocketiumSessionId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    requestRocketiumIdentity().then((identity) => {
+      if (cancelled) return;
+      if (!identity.rocketiumUserId || !identity.rocketiumSessionId) return;
+      setRocketiumIdentity(identity);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [requestRocketiumIdentity, rocketiumSessionId, rocketiumUserId]);
 
   useEffect(() => {
     if (!activeBrandId) {
@@ -337,6 +419,25 @@ export const ExtensionPanel: React.FC = () => {
       return;
     }
 
+    let identity = {
+      rocketiumUserId,
+      rocketiumSessionId,
+    };
+
+    if (!identity.rocketiumUserId || !identity.rocketiumSessionId) {
+      identity = await requestRocketiumIdentity();
+      if (identity.rocketiumUserId && identity.rocketiumSessionId) {
+        setRocketiumIdentity(identity);
+      }
+    }
+
+    if (!identity.rocketiumUserId || !identity.rocketiumSessionId) {
+      setError(
+        "Could not read Rocketium user/session from the active tab. Refresh the Rocketium page and reopen the extension."
+      );
+      return;
+    }
+
     setError(null);
     setIsCreatingJob(true);
 
@@ -344,6 +445,8 @@ export const ExtensionPanel: React.FC = () => {
       const result = await createEvaluationJob(sourceUrl, {
         brand: activeBrand,
         ruleMode: "brand",
+        rocketiumUserId: identity.rocketiumUserId,
+        rocketiumSessionId: identity.rocketiumSessionId,
       });
 
       if (!result.success || !result.jobId) {

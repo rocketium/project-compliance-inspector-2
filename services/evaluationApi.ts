@@ -75,6 +75,8 @@ export interface CreateEvaluationJobOptions {
   platform?: PlatformConfig | null;
   brand?: BrandConfig | null;
   ruleMode?: RuleMode;
+  rocketiumUserId?: string;
+  rocketiumSessionId?: string;
 }
 
 interface RocketiumVariation {
@@ -533,12 +535,16 @@ const createEvaluationJobViaFunction = async ({
   brand,
   ruleMode,
   rules,
+  rocketiumUserId,
+  rocketiumSessionId,
 }: {
   projectLink: string;
   platform: PlatformConfig;
   brand?: BrandConfig | null;
   ruleMode: RuleMode;
   rules: ComplianceRuleDefinition[];
+  rocketiumUserId?: string;
+  rocketiumSessionId?: string;
 }) => {
   const functionBase = getSupabaseFunctionBase();
   if (!functionBase) {
@@ -561,6 +567,8 @@ const createEvaluationJobViaFunction = async ({
       brand_description: brand?.description,
       brand_system_prompt: brand?.systemPrompt,
       rule_mode: ruleMode,
+      rocketium_user_id: rocketiumUserId,
+      rocketium_session_id: rocketiumSessionId,
       rules,
       base_url: getAppBaseUrl(),
     }),
@@ -666,6 +674,8 @@ export const createEvaluationJob = async (
     const platform = options.platform || DEFAULT_PLATFORMS[0];
     const ruleMode = options.ruleMode || "platform";
     const brand = options.brand || null;
+    const rocketiumUserId = options.rocketiumUserId?.trim() || "";
+    const rocketiumSessionId = options.rocketiumSessionId?.trim() || "";
 
     if ((ruleMode === "brand" || ruleMode === "combined") && !brand) {
       return { success: false, error: "Please select a brand rule set." };
@@ -680,6 +690,8 @@ export const createEvaluationJob = async (
         brand,
         ruleMode,
         rules,
+        rocketiumUserId,
+        rocketiumSessionId,
       });
     } catch (functionError) {
       console.warn(

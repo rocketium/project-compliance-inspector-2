@@ -11,7 +11,7 @@ import {
   calculateComplianceScores,
   checkComplianceWithGemini,
 } from "../_shared/gemini.ts";
-import { loadCapsuleDocument } from "../_shared/mongoCapsules.ts";
+import { loadCapsuleDocument, loadCapsuleDocuments } from "../_shared/mongoCapsules.ts";
 import { DEFAULT_PLATFORMS } from "../_shared/platforms.ts";
 import { PromptLayerConfig } from "../_shared/promptLayers.ts";
 import { saveProjectEvaluationSnapshot } from "../_shared/projectEvaluation.ts";
@@ -134,6 +134,8 @@ const analyzeCreative = async ({
   promptLayers,
   capsuleCache,
   snapshotCache,
+  rocketiumUserId,
+  rocketiumSessionId,
 }: {
   supabase: any;
   creative: EvaluationCreative;
@@ -142,6 +144,8 @@ const analyzeCreative = async ({
   promptLayers?: PromptLayerConfig;
   capsuleCache: Map<string, Promise<Record<string, unknown> | null>>;
   snapshotCache: Map<string, ReturnType<typeof buildCapsuleSnapshot>>;
+  rocketiumUserId?: string;
+  rocketiumSessionId?: string;
 }): Promise<EvaluationCreative> => {
   try {
     const compiledRules = Array.isArray(rules)
@@ -184,7 +188,15 @@ const analyzeCreative = async ({
     if (precisionRules.length > 0) {
       const capsuleLookupId = creative.capsuleId || creative.variationId;
 
-      if (!capsuleLookupId) {
+      if (!rocketiumUserId || !rocketiumSessionId) {
+        complianceResults = [
+          ...complianceResults,
+          ...createPrecisionUnavailableResults(
+            precisionRules,
+            "Rocketium user/session details are missing, so fact-based checks were skipped."
+          ),
+        ];
+      } else if (!capsuleLookupId) {
         complianceResults = [
           ...complianceResults,
           ...createPrecisionUnavailableResults(
@@ -195,7 +207,13 @@ const analyzeCreative = async ({
       } else {
         const cacheKey = capsuleLookupId;
         if (!capsuleCache.has(cacheKey)) {
-          capsuleCache.set(cacheKey, loadCapsuleDocument(capsuleLookupId));
+          capsuleCache.set(
+            cacheKey,
+            loadCapsuleDocument(capsuleLookupId, {
+              userId: rocketiumUserId,
+              sessionId: rocketiumSessionId,
+            })
+          );
         }
         const capsuleDoc = await capsuleCache.get(cacheKey)!;
 
@@ -277,6 +295,8 @@ const runBackgroundAnalysis = async ({
   platformPrompt,
   rules,
   promptLayers,
+  rocketiumUserId,
+  rocketiumSessionId,
 }: {
   supabase: any;
   jobId: string;
@@ -288,10 +308,48 @@ const runBackgroundAnalysis = async ({
   platformPrompt: string;
   rules: string[] | ComplianceRuleDefinition[];
   promptLayers?: PromptLayerConfig;
+  rocketiumUserId?: string;
+  rocketiumSessionId?: string;
 }) => {
   try {
     const capsuleCache = new Map<string, Promise<Record<string, unknown> | null>>();
     const snapshotCache = new Map<string, ReturnType<typeof buildCapsuleSnapshot>>();
+    const compiledRules = Array.isArray(rules)
+      ? (rules as ComplianceRuleDefinition[])
+      : [];
+    const { precisionRules } = partitionRulesByEngine(compiledRules);
+
+    if (
+      precisionRules.length > 0 &&
+      rocketiumUserId &&
+      rocketiumSessionId
+    ) {
+      const capsuleIds = Array.from(
+        new Set(
+          creatives
+            .map((creative) => creative.capsuleId || creative.variationId)
+            .filter(Boolean)
+        )
+      ) as string[];
+
+      if (capsuleIds.length > 0) {
+        const capsuleDocs = await loadCapsuleDocuments(capsuleIds, {
+          userId: rocketiumUserId,
+          sessionId: rocketiumSessionId,
+        });
+
+        capsuleIds.forEach((capsuleId) => {
+          capsuleCache.set(
+            capsuleId,
+            Promise.resolve(capsuleDocs.get(capsuleId) || null)
+          );
+        });
+      }
+    }
+
+    const sanitizeCreativesForStorage = (items: EvaluationCreative[]) =>
+      items.map(({ ...creative }) => creative);
+
     await supabase
       .from("evaluation_jobs")
       .update({ status: "analyzing", updated_at: new Date().toISOString() })
@@ -311,7 +369,7 @@ const runBackgroundAnalysis = async ({
           await supabase
             .from("evaluation_jobs")
             .update({
-              creatives: JSON.stringify(results),
+              creatives: JSON.stringify(sanitizeCreativesForStorage(results)),
               analyzed_creatives: resultIndex,
               updated_at: new Date().toISOString(),
             })
@@ -325,6 +383,8 @@ const runBackgroundAnalysis = async ({
             promptLayers,
             capsuleCache,
             snapshotCache,
+            rocketiumUserId,
+            rocketiumSessionId,
           });
 
           results[resultIndex] = analyzed;
@@ -332,7 +392,7 @@ const runBackgroundAnalysis = async ({
           await supabase
             .from("evaluation_jobs")
             .update({
-              creatives: JSON.stringify(results),
+              creatives: JSON.stringify(sanitizeCreativesForStorage(results)),
               analyzed_creatives: resultIndex + 1,
               updated_at: new Date().toISOString(),
             })
@@ -345,7 +405,7 @@ const runBackgroundAnalysis = async ({
       .from("evaluation_jobs")
       .update({
         status: "completed",
-        creatives: JSON.stringify(results),
+        creatives: JSON.stringify(sanitizeCreativesForStorage(results)),
         updated_at: new Date().toISOString(),
       })
       .eq("id", jobId);
@@ -398,6 +458,8 @@ serve(async (req) => {
       brand_description,
       brand_system_prompt,
       rule_mode = "platform",
+      rocketium_user_id,
+      rocketium_session_id,
       rules = [],
       base_url,
     } = body;
@@ -532,6 +594,8 @@ serve(async (req) => {
         platformPrompt: promptToUse,
         rules: compiledRules,
         promptLayers,
+        rocketiumUserId: rocketium_user_id,
+        rocketiumSessionId: rocketium_session_id,
       })
     );
 

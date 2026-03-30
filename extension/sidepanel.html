@@ -32,6 +32,29 @@
         <p class="hint">
           Point this to the deployed app or your local Vite server.
         </p>
+
+        <div class="settings-group">
+          <label for="rocketium-user-id">Rocketium User ID</label>
+          <input
+            id="rocketium-user-id"
+            type="text"
+            placeholder="Optional manual override"
+          />
+        </div>
+
+        <div class="settings-group">
+          <label for="rocketium-session-id">Rocketium Session ID</label>
+          <input
+            id="rocketium-session-id"
+            type="text"
+            placeholder="Optional manual override"
+          />
+        </div>
+
+        <p class="hint">
+          Leave these blank to use the active Rocketium tab automatically. Fill them only if you want to override.
+        </p>
+        <p id="identity-status" class="hint status-pill">Not detected yet</p>
       </section>
 
       <iframe

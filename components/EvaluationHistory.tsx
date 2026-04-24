@@ -42,6 +42,11 @@ export const EvaluationHistory: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const getEvaluationTitle = (evaluation: StoredProjectEvaluation): string => {
+    const title = evaluation.projectName?.trim();
+    return title || "Untitled project";
+  };
+
   // Load all evaluations
   useEffect(() => {
     const loadHistory = async () => {
@@ -65,17 +70,19 @@ export const EvaluationHistory: React.FC = () => {
   }, []);
 
   // Handle delete
-  const handleDelete = async (projectId: string, e: React.MouseEvent) => {
+  const handleDelete = async (
+    evaluation: StoredProjectEvaluation,
+    e: React.MouseEvent
+  ) => {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this evaluation?")) return;
+    if (!evaluation.id) return;
+    if (!confirm("Are you sure you want to delete this saved run?")) return;
 
-    setDeletingId(projectId);
+    setDeletingId(evaluation.id);
     try {
-      const result = await deleteProjectEvaluation(projectId);
+      const result = await deleteProjectEvaluation(evaluation.id);
       if (result.success) {
-        setEvaluations((prev) =>
-          prev.filter((ev) => ev.projectId !== projectId)
-        );
+        setEvaluations((prev) => prev.filter((ev) => ev.id !== evaluation.id));
       }
     } catch (err) {
       console.error("Failed to delete:", err);
@@ -114,25 +121,25 @@ export const EvaluationHistory: React.FC = () => {
     <div className="h-screen max-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col transition-colors overflow-hidden">
       {/* Header */}
       <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex-shrink-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
             <button
               onClick={() => navigate("/")}
-              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-400"
+              className="mt-0.5 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-400"
             >
               <ArrowLeft size={20} />
             </button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-3">
               <div className="bg-indigo-600 p-1.5 rounded-lg">
                 <History className="text-white h-5 w-5" />
               </div>
-              <div>
+              <div className="space-y-1">
                 <h1 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight">
                   Evaluation History
                 </h1>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {evaluations.length} project
-                  {evaluations.length !== 1 ? "s" : ""} evaluated
+                <p className="text-sm leading-none text-slate-500 dark:text-slate-400">
+                  {evaluations.length} saved run
+                  {evaluations.length !== 1 ? "s" : ""}
                 </p>
               </div>
             </div>
@@ -176,7 +183,7 @@ export const EvaluationHistory: React.FC = () => {
                 No Evaluations Yet
               </h2>
               <p className="text-slate-600 dark:text-slate-400 mb-6 text-center max-w-md">
-                Start by evaluating a project. Your evaluation history will
+                Start by evaluating a project. Your saved evaluation runs will
                 appear here.
               </p>
               <button
@@ -187,7 +194,7 @@ export const EvaluationHistory: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-5">
               {evaluations.map((evaluation) => {
                 const avgScore = getAverageScore(evaluation);
                 const analyzedCount = evaluation.creatives.filter(
@@ -198,7 +205,13 @@ export const EvaluationHistory: React.FC = () => {
                   <div
                     key={evaluation.id || evaluation.projectId}
                     onClick={() =>
-                      navigate(`/evaluate-project/${evaluation.projectId}`)
+                      navigate(
+                        evaluation.id
+                          ? `/evaluate-project/${evaluation.projectId}?evaluationId=${encodeURIComponent(
+                              evaluation.id
+                            )}`
+                          : `/evaluate-project/${evaluation.projectId}`
+                      )
                     }
                     className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
                   >
@@ -207,18 +220,13 @@ export const EvaluationHistory: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-lg font-semibold text-slate-800 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                            {evaluation.projectName || evaluation.projectId}
+                            {getEvaluationTitle(evaluation)}
                           </h3>
                           <ExternalLink
                             size={16}
                             className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
                           />
                         </div>
-                        {evaluation.projectName && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 truncate">
-                            {evaluation.projectId}
-                          </p>
-                        )}
 
                         <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
                           <span className="flex items-center gap-1">
@@ -226,13 +234,16 @@ export const EvaluationHistory: React.FC = () => {
                             {evaluation.creatives.length} creative
                             {evaluation.creatives.length !== 1 ? "s" : ""}
                           </span>
+                          <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300">
+                            {evaluation.platformId}
+                          </span>
                           <span className="flex items-center gap-1">
                             <BarChart3 size={14} />
                             {analyzedCount} analyzed
                           </span>
                           <span className="flex items-center gap-1">
                             <Calendar size={14} />
-                            {formatDate(evaluation.updatedAt)}
+                            Run saved {formatDate(evaluation.updatedAt)}
                           </span>
                         </div>
 
@@ -296,12 +307,12 @@ export const EvaluationHistory: React.FC = () => {
 
                         {/* Delete Button */}
                         <button
-                          onClick={(e) => handleDelete(evaluation.projectId, e)}
-                          disabled={deletingId === evaluation.projectId}
+                          onClick={(e) => handleDelete(evaluation, e)}
+                          disabled={deletingId === evaluation.id}
                           className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
-                          title="Delete evaluation"
+                          title="Delete saved run"
                         >
-                          {deletingId === evaluation.projectId ? (
+                          {deletingId === evaluation.id ? (
                             <Loader2 size={18} className="animate-spin" />
                           ) : (
                             <Trash2 size={18} />
@@ -321,4 +332,3 @@ export const EvaluationHistory: React.FC = () => {
 };
 
 export default EvaluationHistory;
-

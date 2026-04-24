@@ -44,6 +44,17 @@ const creativeHasFailures = (creative: EvaluationCreative) =>
 const getCreativeFailCount = (creative: EvaluationCreative) =>
   creative.complianceResults?.filter((result) => result.status === "FAIL").length || 0;
 
+const getProjectDisplayName = (creative: EvaluationCreative) =>
+  creative.sourceProjectName?.trim() || "Project";
+
+const getCreativeSizeLabel = (creative: EvaluationCreative) => {
+  if (!creative.width || !creative.height) {
+    return null;
+  }
+
+  return `${creative.width}×${creative.height}`;
+};
+
 export const ExtensionPanel: React.FC = () => {
   const [searchParams] = useSearchParams();
   const sourceUrl = searchParams.get("source") || "";
@@ -858,8 +869,7 @@ export const ExtensionPanel: React.FC = () => {
                                       {creative.name}
                                     </div>
                                     <div className="text-xs text-zinc-500 truncate mt-1">
-                                      {creative.sourceProjectName ||
-                                        creative.sourceProjectId}
+                                      {getProjectDisplayName(creative)}
                                     </div>
                                   </div>
                                   <span className="text-[11px] text-zinc-300 bg-zinc-800 px-2 py-1 rounded-full capitalize">
@@ -867,9 +877,11 @@ export const ExtensionPanel: React.FC = () => {
                                   </span>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 mt-3 text-[11px]">
-                                  <span className="rounded-full bg-zinc-800 px-2 py-1 text-zinc-400">
-                                    {creative.dimensionKey}
-                                  </span>
+                                  {getCreativeSizeLabel(creative) && (
+                                    <span className="rounded-full bg-zinc-800 px-2 py-1 text-zinc-400">
+                                      {getCreativeSizeLabel(creative)}
+                                    </span>
+                                  )}
                                   {failCount > 0 && (
                                     <span className="rounded-full bg-rose-500/10 px-2 py-1 text-rose-300">
                                       {failCount} failed rule{failCount > 1 ? "s" : ""}
@@ -976,8 +988,7 @@ export const ExtensionPanel: React.FC = () => {
                                 {selectedCreative.name}
                               </div>
                               <div className="text-sm text-zinc-500 mt-1">
-                                {selectedCreative.sourceProjectName ||
-                                  selectedCreative.sourceProjectId}
+                                {getProjectDisplayName(selectedCreative)}
                               </div>
                               <div className="text-sm text-zinc-500 mt-1">
                                 Variant:{" "}
@@ -1021,9 +1032,11 @@ export const ExtensionPanel: React.FC = () => {
                               <span className="rounded-full bg-zinc-800 px-2.5 py-1 text-xs text-zinc-300 capitalize">
                                 {selectedCreative.status}
                               </span>
-                              <span className="rounded-full bg-zinc-800 px-2.5 py-1 text-xs text-zinc-300">
-                                {selectedCreative.dimensionKey}
-                              </span>
+                              {getCreativeSizeLabel(selectedCreative) && (
+                                <span className="rounded-full bg-zinc-800 px-2.5 py-1 text-xs text-zinc-300">
+                                  {getCreativeSizeLabel(selectedCreative)}
+                                </span>
+                              )}
                             </div>
                           </div>
 

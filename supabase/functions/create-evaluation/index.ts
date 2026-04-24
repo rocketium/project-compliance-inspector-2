@@ -413,6 +413,7 @@ const runBackgroundAnalysis = async ({
     if (shouldPersistProjectEvaluation) {
       await saveProjectEvaluationSnapshot({
         supabase,
+        evaluationJobId: jobId,
         projectId,
         projectName,
         platformId,
@@ -589,7 +590,7 @@ serve(async (req) => {
         projectId: source.projectIds[0],
         projectName,
         platformId: platform_id,
-        shouldPersistProjectEvaluation: source.sourceType === "single",
+        shouldPersistProjectEvaluation: source.projectIds.length === 1,
         creatives,
         platformPrompt: promptToUse,
         rules: compiledRules,

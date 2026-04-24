@@ -149,6 +149,9 @@ export const EvaluationPreview: React.FC = () => {
   >("all");
   const [selectedSourceProjectId, setSelectedSourceProjectId] = useState("all");
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const [highlightedRuleKey, setHighlightedRuleKey] = useState<string | null>(
+    null
+  );
 
   // Attention Insight state
   const [showHeatmap, setShowHeatmap] = useState(false);
@@ -159,6 +162,11 @@ export const EvaluationPreview: React.FC = () => {
   const [analyzingAttentionIds, setAnalyzingAttentionIds] = useState<
     Set<string>
   >(new Set());
+
+  const getProjectLabel = (projectName?: string, fallback = "Project") => {
+    const label = projectName?.trim();
+    return label || fallback;
+  };
 
   // Helper to merge server job data with local attention results
   // This preserves locally-computed attention results that haven't been saved to the server yet
@@ -292,14 +300,39 @@ export const EvaluationPreview: React.FC = () => {
     [job, selectedCreativeId]
   );
 
+  const highlightedElements = useMemo(() => {
+    if (!selectedCreative?.analysisResult?.elements || !highlightedRuleKey) {
+      return [];
+    }
+
+    const result = selectedCreative.complianceResults?.find(
+      (item) =>
+        `${item.ruleId || item.ruleTitle || item.rule}-${item.engine || "visual"}` ===
+        highlightedRuleKey
+    );
+
+    if (!result?.relatedElementIds?.length) {
+      return [];
+    }
+
+    const ids = new Set(result.relatedElementIds);
+    return selectedCreative.analysisResult.elements.filter((element) =>
+      ids.has(element.id)
+    );
+  }, [selectedCreative, highlightedRuleKey]);
+
   const sourceProjectOptions = useMemo(() => {
     if (!job) return [];
     const seen = new Map<string, string>();
+    let unnamedProjectCount = 1;
     job.creatives.forEach((creative) => {
-      if (creative.sourceProjectId) {
+      if (creative.sourceProjectId && !seen.has(creative.sourceProjectId)) {
         seen.set(
           creative.sourceProjectId,
-          creative.sourceProjectName || creative.sourceProjectId
+          getProjectLabel(
+            creative.sourceProjectName,
+            `Project ${unnamedProjectCount++}`
+          )
         );
       }
     });
@@ -325,10 +358,25 @@ export const EvaluationPreview: React.FC = () => {
     return Array.from(grouped.entries()).map(([sourceProjectId, creatives]) => ({
       sourceProjectId,
       sourceProjectName:
-        creatives[0]?.sourceProjectName || creatives[0]?.sourceProjectId || "Project",
+        sourceProjectOptions.find((project) => project.id === sourceProjectId)
+          ?.name || getProjectLabel(creatives[0]?.sourceProjectName),
       creatives,
     }));
-  }, [visibleCreatives]);
+  }, [visibleCreatives, sourceProjectOptions]);
+
+  const headerSubtitle = useMemo(() => {
+    if (!job) return "";
+
+    const parts: string[] = [];
+    if (job.sourceProjectIds.length > 1) {
+      parts.push(`${job.sourceProjectIds.length} projects`);
+    }
+    if (job.brandName) {
+      parts.push(job.brandName);
+    }
+
+    return parts.join(" · ");
+  }, [job]);
 
   const groupedFilteredResults = useMemo(() => {
     if (!selectedCreative?.complianceResults) return [];
@@ -348,6 +396,10 @@ export const EvaluationPreview: React.FC = () => {
       setSelectedSourceProjectId("all");
     }
   }, [sourceProjectOptions.length, selectedSourceProjectId]);
+
+  useEffect(() => {
+    setHighlightedRuleKey(null);
+  }, [selectedCreativeId]);
 
   useEffect(() => {
     if (!visibleCreatives.length) {
@@ -496,6 +548,24 @@ export const EvaluationPreview: React.FC = () => {
     });
   };
 
+  const getResultKey = (result: ComplianceResult) =>
+    `${result.ruleId || result.ruleTitle || result.rule}-${result.engine || "visual"}`;
+
+  const toggleResultHighlight = (result: ComplianceResult) => {
+    if (
+      (result.engine || "visual") !== "visual" ||
+      !result.relatedElementIds?.length
+    ) {
+      setHighlightedRuleKey(null);
+      return;
+    }
+
+    const resultKey = getResultKey(result);
+    setHighlightedRuleKey((current) =>
+      current === resultKey ? null : resultKey
+    );
+  };
+
   // Toggle expand for compliance item
   const toggleExpand = (index: number) => {
     const newExpanded = new Set(expandedItems);
@@ -505,6 +575,45 @@ export const EvaluationPreview: React.FC = () => {
       newExpanded.add(index);
     }
     setExpandedItems(newExpanded);
+  };
+
+  const renderHighlightedElementOverlay = (
+    element: NonNullable<EvaluationCreative["analysisResult"]>["elements"][number]
+  ) => {
+    if (element.polygon?.length) {
+      const points = element.polygon
+        .map((point) => `${point.x * 100},${point.y * 100}`)
+        .join(" ");
+
+      return (
+        <svg
+          key={element.id}
+          className="absolute inset-0 h-full w-full"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+        >
+          <polygon
+            points={points}
+            className="fill-violet-500/20 stroke-violet-300"
+            strokeWidth={0.8}
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
+    }
+
+    return (
+      <div
+        key={element.id}
+        className="absolute rounded-lg border-2 border-violet-300 bg-violet-500/15 shadow-[0_0_0_1px_rgba(139,92,246,0.25)]"
+        style={{
+          left: `${element.box.xmin * 100}%`,
+          top: `${element.box.ymin * 100}%`,
+          width: `${(element.box.xmax - element.box.xmin) * 100}%`,
+          height: `${(element.box.ymax - element.box.ymin) * 100}%`,
+        }}
+      />
+    );
   };
 
   // Render badges
@@ -629,20 +738,13 @@ export const EvaluationPreview: React.FC = () => {
               </div>
               <div className="min-w-0">
                 <h1 className="text-sm font-semibold text-slate-900 dark:text-white tracking-tight leading-tight truncate">
-                  {job.projectName || "Project Evaluation"}
+                  {getProjectLabel(job.projectName, "Project Evaluation")}
                 </h1>
-                <p className="text-[10px] text-slate-500 dark:text-slate-500 font-mono leading-tight truncate">
-                  {job.projectId}
-                </p>
-                <p className="text-[10px] text-slate-500 dark:text-slate-500 leading-tight truncate">
-                  {job.sourceProjectIds.length > 1
-                    ? `${job.sourceProjectIds.length} projects`
-                    : "1 project"}
-                  {job.workspaceShortId
-                    ? ` · Workspace ${job.workspaceShortId}`
-                    : ""}
-                  {job.brandName ? ` · ${job.brandName}` : ""}
-                </p>
+                {headerSubtitle && (
+                  <p className="text-[10px] text-slate-500 dark:text-slate-500 leading-tight truncate">
+                    {headerSubtitle}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -993,6 +1095,12 @@ export const EvaluationPreview: React.FC = () => {
                           </div>
                         )}
 
+                      {highlightedElements.length > 0 && (
+                        <div className="absolute inset-0 pointer-events-none z-10">
+                          {highlightedElements.map(renderHighlightedElementOverlay)}
+                        </div>
+                      )}
+
                       {/* Original image (top layer - clipped by slider) */}
                       <div
                         className="absolute inset-0 overflow-hidden"
@@ -1055,17 +1163,24 @@ export const EvaluationPreview: React.FC = () => {
                   </div>
                 ) : (
                   /* Normal image view */
-                  <img
-                    key={selectedCreative.id}
-                    src={selectedCreative.url}
-                    alt={selectedCreative.name}
-                    className="max-w-full max-h-full object-contain shadow-xl shadow-slate-400/20 dark:shadow-slate-900/50 rounded-lg ring-1 ring-slate-200/50 dark:ring-slate-700/50"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='400' height='300' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='14'%3EImage Failed to Load%3C/text%3E%3C/svg%3E";
-                    }}
-                    draggable={false}
-                  />
+                  <div className="relative inline-block">
+                    <img
+                      key={selectedCreative.id}
+                      src={selectedCreative.url}
+                      alt={selectedCreative.name}
+                      className="max-w-full max-h-full object-contain shadow-xl shadow-slate-400/20 dark:shadow-slate-900/50 rounded-lg ring-1 ring-slate-200/50 dark:ring-slate-700/50"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src =
+                          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='400' height='300' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='14'%3EImage Failed to Load%3C/text%3E%3C/svg%3E";
+                      }}
+                      draggable={false}
+                    />
+                    {highlightedElements.length > 0 && (
+                      <div className="absolute inset-0 pointer-events-none">
+                        {highlightedElements.map(renderHighlightedElementOverlay)}
+                      </div>
+                    )}
+                  </div>
                 )}
               </ZoomPanControls>
             </>
@@ -1718,7 +1833,9 @@ export const EvaluationPreview: React.FC = () => {
                                       <div
                                         key={`${group.checkType}-${idx}-${res.ruleId || res.rule}-${engineGroup.engine}`}
                                         className={`rounded-xl border transition-all duration-200 overflow-hidden ${
-                                          res.status === "FAIL"
+                                          highlightedRuleKey === getResultKey(res)
+                                            ? "border-violet-300 dark:border-violet-500 bg-violet-50/70 dark:bg-violet-900/20 shadow-sm shadow-violet-200/30 dark:shadow-violet-900/20"
+                                            : res.status === "FAIL"
                                             ? "border-rose-200 dark:border-rose-800/50 bg-gradient-to-br from-rose-50/50 to-white dark:from-rose-900/10 dark:to-slate-800/50"
                                             : res.status === "WARNING"
                                             ? "border-amber-200 dark:border-amber-800/50 bg-gradient-to-br from-amber-50/50 to-white dark:from-amber-900/10 dark:to-slate-800/50"
@@ -1726,8 +1843,16 @@ export const EvaluationPreview: React.FC = () => {
                                         }`}
                                       >
                                         <div
-                                          className="p-2.5 cursor-pointer"
-                                          onClick={() => toggleExpand(originalIndex)}
+                                          className={`p-2.5 ${
+                                            (res.engine || "visual") === "visual" &&
+                                            res.relatedElementIds?.length
+                                              ? "cursor-pointer"
+                                              : "cursor-default"
+                                          }`}
+                                          onClick={() => {
+                                            toggleExpand(originalIndex);
+                                            toggleResultHighlight(res);
+                                          }}
                                         >
                                           <div className="flex gap-2 items-start">
                                             <div className="mt-px flex-shrink-0">
@@ -1752,6 +1877,13 @@ export const EvaluationPreview: React.FC = () => {
                                                 {res.engine !== "precision" &&
                                                   getCategoryBadge(res.category)}
                                                 {getSeverityBadge(res.severity)}
+                                                {(res.engine || "visual") ===
+                                                  "visual" &&
+                                                  res.relatedElementIds?.length && (
+                                                    <span className="text-[9px] font-semibold px-1.5 py-px rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300 border border-violet-200/60 dark:border-violet-700/50">
+                                                      Highlights image
+                                                    </span>
+                                                  )}
                                                 {res.ruleSource && (
                                                   <span className="text-[9px] font-semibold px-1.5 py-px rounded-full bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-300 border border-slate-200/50 dark:border-slate-600/50 capitalize">
                                                     {res.ruleSource}

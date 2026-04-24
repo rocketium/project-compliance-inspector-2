@@ -63,7 +63,7 @@ const ThemeToggle: React.FC = () => {
   );
 };
 
-const getCheckTypeHeaderClasses = (checkType?: string) => {
+const getCheckTypeHeaderTextClasses = (checkType?: string) => {
   const normalized = checkType?.toLowerCase() || "";
 
   if (
@@ -71,7 +71,7 @@ const getCheckTypeHeaderClasses = (checkType?: string) => {
     normalized.includes("type") ||
     normalized.includes("legibility")
   ) {
-    return "border-amber-100/80 bg-amber-50/45 dark:border-amber-500/15 dark:bg-amber-500/6";
+    return "text-amber-700 dark:text-amber-300";
   }
 
   if (
@@ -79,7 +79,7 @@ const getCheckTypeHeaderClasses = (checkType?: string) => {
     normalized.includes("brand") ||
     normalized.includes("variant")
   ) {
-    return "border-violet-100/80 bg-violet-50/45 dark:border-violet-500/15 dark:bg-violet-500/6";
+    return "text-violet-700 dark:text-violet-300";
   }
 
   if (
@@ -87,7 +87,7 @@ const getCheckTypeHeaderClasses = (checkType?: string) => {
     normalized.includes("localization") ||
     normalized.includes("content verification")
   ) {
-    return "border-cyan-100/80 bg-cyan-50/45 dark:border-cyan-500/15 dark:bg-cyan-500/6";
+    return "text-cyan-700 dark:text-cyan-300";
   }
 
   if (
@@ -96,10 +96,10 @@ const getCheckTypeHeaderClasses = (checkType?: string) => {
     normalized.includes("framing") ||
     normalized.includes("safe area")
   ) {
-    return "border-emerald-100/80 bg-emerald-50/45 dark:border-emerald-500/15 dark:bg-emerald-500/6";
+    return "text-emerald-700 dark:text-emerald-300";
   }
 
-  return "border-slate-200/80 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/50";
+  return "text-slate-700 dark:text-slate-200";
 };
 
 // Score ring component
@@ -1869,15 +1869,15 @@ export const EvaluationPreview: React.FC = () => {
                                   key={`${engineGroup.engine}-${group.checkType}`}
                                   className="space-y-2"
                                 >
-                              <div
-                                className={`rounded-2xl border px-3 py-2.5 ${getCheckTypeHeaderClasses(
-                                  group.checkType
-                                )}`}
-                              >
+                              <div className="px-1 py-0.5">
                                 <div className="text-[9px] font-medium uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
                                   Rule Category
                                 </div>
-                                <div className="mt-0.5 text-[13px] font-medium text-slate-700 dark:text-slate-200">
+                                <div
+                                  className={`mt-0.5 text-[13px] font-medium leading-tight ${getCheckTypeHeaderTextClasses(
+                                    group.checkType
+                                  )}`}
+                                >
                                   {group.checkType}
                                 </div>
                               </div>

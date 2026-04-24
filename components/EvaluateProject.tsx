@@ -5,7 +5,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   analyzeImageWithGemini,
   checkComplianceWithGemini,
@@ -120,6 +120,38 @@ const getApiBaseUrl = () => {
   );
 };
 
+const createEvaluationRunId = (): string => {
+  if (
+    typeof globalThis.crypto !== "undefined" &&
+    typeof globalThis.crypto.randomUUID === "function"
+  ) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  if (
+    typeof globalThis.crypto !== "undefined" &&
+    typeof globalThis.crypto.getRandomValues === "function"
+  ) {
+    const bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (byte) =>
+      byte.toString(16).padStart(2, "0")
+    ).join("");
+
+    return [
+      hex.slice(0, 8),
+      hex.slice(8, 12),
+      hex.slice(12, 16),
+      hex.slice(16, 20),
+      hex.slice(20),
+    ].join("-");
+  }
+
+  return "00000000-0000-4000-8000-000000000000";
+};
+
 // Theme toggle button with refined styling
 const ThemeToggle: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
@@ -137,7 +169,9 @@ const ThemeToggle: React.FC = () => {
 export const EvaluateProject: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { theme } = useTheme();
+  const requestedEvaluationId = searchParams.get("evaluationId")?.trim() || undefined;
 
   // State
   const [isLoading, setIsLoading] = useState(true);
@@ -174,6 +208,11 @@ export const EvaluateProject: React.FC = () => {
   creativesRef.current = creatives;
   const projectNameRef = useRef<string | null>(null);
   projectNameRef.current = projectName;
+  const saveEvaluationIdRef = useRef<string>(createEvaluationRunId());
+
+  useEffect(() => {
+    saveEvaluationIdRef.current = createEvaluationRunId();
+  }, [projectId, requestedEvaluationId]);
 
   // Get active platform
   const activePlatform =
@@ -284,7 +323,10 @@ export const EvaluateProject: React.FC = () => {
         }
 
         setIsLoadingSaved(true);
-        const savedResult = await loadProjectEvaluation(projectId);
+        const savedResult = await loadProjectEvaluation(
+          projectId,
+          requestedEvaluationId
+        );
 
         if (isCancelled) return;
 
@@ -346,7 +388,7 @@ export const EvaluateProject: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, requestedEvaluationId]);
 
   // Save results to database
   const saveResults = useCallback(
@@ -381,7 +423,10 @@ export const EvaluateProject: React.FC = () => {
             projectId,
             activePlatformId,
             storedCreatives,
-            projectNameRef.current || undefined
+            projectNameRef.current || undefined,
+            {
+              evaluationId: saveEvaluationIdRef.current,
+            }
           );
           if (result.success) {
             console.log(`Saved ${storedCreatives.length} creative results`);
@@ -798,9 +843,6 @@ export const EvaluateProject: React.FC = () => {
                 <h1 className="text-sm font-semibold text-slate-900 dark:text-white tracking-tight leading-tight">
                   {projectName || "Project Evaluation"}
                 </h1>
-                <p className="text-[10px] text-slate-500 dark:text-slate-500 font-mono leading-tight">
-                  {projectId}
-                </p>
               </div>
             </div>
           </div>

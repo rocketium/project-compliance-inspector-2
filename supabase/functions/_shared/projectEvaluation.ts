@@ -7,12 +7,14 @@ const getStoredCreativeId = (creative: EvaluationCreative) =>
 
 export const saveProjectEvaluationSnapshot = async ({
   supabase,
+  evaluationJobId,
   projectId,
   projectName,
   platformId,
   creatives,
 }: {
   supabase: any;
+  evaluationJobId: string;
   projectId: string;
   projectName?: string | null;
   platformId: string;
@@ -44,6 +46,7 @@ export const saveProjectEvaluationSnapshot = async ({
   const now = new Date().toISOString();
   const { error } = await supabase.from("project_evaluations").upsert(
     {
+      evaluation_job_id: evaluationJobId,
       project_id: projectId,
       project_name: projectName || null,
       platform_id: platformId,
@@ -52,7 +55,7 @@ export const saveProjectEvaluationSnapshot = async ({
       created_at: now,
     },
     {
-      onConflict: "project_id",
+      onConflict: "evaluation_job_id",
       ignoreDuplicates: false,
     }
   );

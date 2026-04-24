@@ -493,7 +493,7 @@ const runBackgroundAnalysis = async ({
 
     await updateJobStatus(jobId, "completed");
 
-    if (source.projectIds.length === 1 && ruleMode === "platform") {
+    if (source.projectIds.length === 1) {
       const storedCreatives: StoredCreativeResult[] = results
         .filter((creative) => creative.complianceResults || creative.analysisResult)
         .map((creative) => ({
@@ -519,7 +519,10 @@ const runBackgroundAnalysis = async ({
           source.projectIds[0],
           platform.id,
           storedCreatives,
-          projectName
+          projectName,
+          {
+            evaluationJobId: jobId,
+          }
         );
       }
     }

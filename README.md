@@ -44,6 +44,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1pSrIvrSggxHUQi0UzqZtXe
 ## Supabase migration
 
 Run the SQL in `supabase_migration.sql` to add:
+- append-per-run `project_evaluations` storage with `evaluation_job_id`
 - `evaluation_jobs.metadata`
 - `platform_configs`
 - `brand_configs`

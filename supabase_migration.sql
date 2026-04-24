@@ -1,16 +1,26 @@
 -- Create project_evaluations table for storing analysis results
 CREATE TABLE IF NOT EXISTS project_evaluations (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  project_id TEXT NOT NULL UNIQUE,
+  project_id TEXT NOT NULL,
   project_name TEXT,
+  evaluation_job_id TEXT,
   platform_id TEXT NOT NULL,
   creatives JSONB NOT NULL DEFAULT '[]',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Migration: switch from one-row-per-project to one-row-per-evaluation-run
+ALTER TABLE project_evaluations
+  DROP CONSTRAINT IF EXISTS project_evaluations_project_id_key;
+
+ALTER TABLE project_evaluations
+  ADD COLUMN IF NOT EXISTS evaluation_job_id TEXT;
+
 -- Create index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_project_evaluations_project_id ON project_evaluations(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_evaluations_updated_at ON project_evaluations(updated_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_project_evaluations_evaluation_job_id ON project_evaluations(evaluation_job_id);
 
 -- Enable Row Level Security
 ALTER TABLE project_evaluations ENABLE ROW LEVEL SECURITY;

@@ -107,9 +107,10 @@ serve(async (req) => {
       );
     }
 
-    if ((metadata.sourceType || "single") === "single") {
+    if ((metadata.sourceProjectIds?.length || 0) === 1) {
       await saveProjectEvaluationSnapshot({
         supabase,
+        evaluationJobId: job_id,
         projectId: jobData.project_id,
         projectName: jobData.project_name,
         platformId: jobData.platform_id,

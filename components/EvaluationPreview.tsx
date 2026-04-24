@@ -55,12 +55,51 @@ const ThemeToggle: React.FC = () => {
   return (
     <button
       onClick={toggleTheme}
-      className="p-1.5 rounded-lg bg-slate-100/80 dark:bg-slate-700/50 hover:bg-slate-200/80 dark:hover:bg-slate-600/50 transition-all duration-200 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 backdrop-blur-sm"
+      className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-700/50 hover:bg-slate-200/80 dark:hover:bg-slate-600/50 transition-all duration-200 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 backdrop-blur-sm"
       title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
     >
-      {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
+      {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
     </button>
   );
+};
+
+const getCheckTypeHeaderClasses = (checkType?: string) => {
+  const normalized = checkType?.toLowerCase() || "";
+
+  if (
+    normalized.includes("copy") ||
+    normalized.includes("type") ||
+    normalized.includes("legibility")
+  ) {
+    return "border-amber-100/80 bg-amber-50/45 dark:border-amber-500/15 dark:bg-amber-500/6";
+  }
+
+  if (
+    normalized.includes("logo") ||
+    normalized.includes("brand") ||
+    normalized.includes("variant")
+  ) {
+    return "border-violet-100/80 bg-violet-50/45 dark:border-violet-500/15 dark:bg-violet-500/6";
+  }
+
+  if (
+    normalized.includes("policy") ||
+    normalized.includes("localization") ||
+    normalized.includes("content verification")
+  ) {
+    return "border-cyan-100/80 bg-cyan-50/45 dark:border-cyan-500/15 dark:bg-cyan-500/6";
+  }
+
+  if (
+    normalized.includes("image") ||
+    normalized.includes("crop") ||
+    normalized.includes("framing") ||
+    normalized.includes("safe area")
+  ) {
+    return "border-emerald-100/80 bg-emerald-50/45 dark:border-emerald-500/15 dark:bg-emerald-500/6";
+  }
+
+  return "border-slate-200/80 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/50";
 };
 
 // Score ring component
@@ -377,6 +416,7 @@ export const EvaluationPreview: React.FC = () => {
 
     return parts.join(" · ");
   }, [job]);
+  const hasHeaderSubtitle = Boolean(headerSubtitle);
 
   const groupedFilteredResults = useMemo(() => {
     if (!selectedCreative?.complianceResults) return [];
@@ -724,16 +764,20 @@ export const EvaluationPreview: React.FC = () => {
     <div className="h-screen max-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900 flex flex-col transition-colors overflow-hidden text-[13px]">
       {/* Header */}
       <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 flex-shrink-0 z-30">
-        <div className="max-w-full mx-auto px-4 py-2.5 flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3 min-w-0">
+        <div className="max-w-full mx-auto px-3 py-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               onClick={() => navigate("/")}
-              className="mt-0.5 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
             >
               <ArrowLeft size={16} />
             </button>
-            <div className="flex items-start gap-2 min-w-0">
-              <div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-1.5 rounded-lg shadow-md shadow-indigo-500/20 mt-0.5">
+            <div
+              className={`flex min-w-0 gap-2 ${
+                hasHeaderSubtitle ? "items-start" : "items-center"
+              }`}
+            >
+              <div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-1.5 rounded-lg shadow-md shadow-indigo-500/20">
                 <Layers className="text-white h-4 w-4" />
               </div>
               <div className="min-w-0">
@@ -741,7 +785,7 @@ export const EvaluationPreview: React.FC = () => {
                   {getProjectLabel(job.projectName, "Project Evaluation")}
                 </h1>
                 {headerSubtitle && (
-                  <p className="text-[10px] text-slate-500 dark:text-slate-500 leading-tight truncate">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight truncate">
                     {headerSubtitle}
                   </p>
                 )}
@@ -749,20 +793,20 @@ export const EvaluationPreview: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {/* Job Status */}
-            <div className="flex items-center gap-3 px-3 py-1.5 bg-slate-100/80 dark:bg-slate-800/50 rounded-xl backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50">
+            <div className="min-h-10 flex items-center gap-2.5 px-2.5 py-1 bg-slate-100/80 dark:bg-slate-800/50 rounded-lg backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50">
               {job.status === "analyzing" || job.status === "pending" ? (
                 <div className="flex items-center gap-1.5">
                   <div className="relative">
                     <div className="w-4 h-4 rounded-full border-2 border-indigo-200 dark:border-indigo-800" />
                     <div className="absolute inset-0 w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
                   </div>
-                  <div>
+                  <div className="flex items-baseline gap-1.5">
                     <div className="text-[9px] uppercase tracking-wider text-indigo-500 font-medium leading-tight">
                       {job.status === "pending" ? "Starting" : "Analyzing"}
                     </div>
-                    <div className="text-sm font-bold text-indigo-600 dark:text-indigo-400 tabular-nums leading-tight">
+                    <div className="text-base font-bold text-indigo-600 dark:text-indigo-400 tabular-nums leading-tight">
                       {job.creatives.filter((c) => c.complianceScores).length}/
                       {job.totalCreatives}
                     </div>
@@ -777,10 +821,10 @@ export const EvaluationPreview: React.FC = () => {
                           ? "bg-emerald-500"
                           : projectStatus.avgScore >= 60
                           ? "bg-amber-500"
-                          : "bg-rose-500"
+                        : "bg-rose-500"
                       }`}
                     />
-                    <div>
+                    <div className="flex items-baseline gap-1.5">
                       <div className="text-[9px] uppercase tracking-wider text-slate-500 dark:text-slate-500 font-medium leading-tight">
                         Avg Score
                       </div>
@@ -798,7 +842,7 @@ export const EvaluationPreview: React.FC = () => {
                     </div>
                   </div>
                   <div className="w-px h-6 bg-slate-300/50 dark:bg-slate-600/50" />
-                  <div>
+                  <div className="flex items-baseline gap-1.5">
                     <div className="text-[9px] uppercase tracking-wider text-slate-500 dark:text-slate-500 font-medium leading-tight">
                       Analyzed
                     </div>
@@ -809,8 +853,8 @@ export const EvaluationPreview: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <div>
-                  <div className="text-[9px] uppercase tracking-wider text-slate-500 font-medium leading-tight">
+                <div className="flex items-baseline gap-1.5">
+                  <div className="text-[9px] uppercase tracking-wider text-slate-500 dark:text-slate-500 font-medium leading-tight">
                     Creatives
                   </div>
                   <div className="text-sm font-bold text-slate-700 dark:text-slate-200 tabular-nums leading-tight">
@@ -823,7 +867,7 @@ export const EvaluationPreview: React.FC = () => {
             {/* Share Button */}
             <button
               onClick={copyShareLink}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-200 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-sm"
+              className="min-h-10 flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-200 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-sm"
             >
               {copied ? (
                 <>
@@ -849,7 +893,7 @@ export const EvaluationPreview: React.FC = () => {
       <main className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Sidebar - Creative List */}
         <div className="w-64 flex-shrink-0 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-700/50 flex flex-col min-h-0">
-          <div className="px-3 py-2.5 border-b border-slate-200/50 dark:border-slate-700/50">
+          <div className="px-2.5 py-2 border-b border-slate-200/50 dark:border-slate-700/50">
             <h2 className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-2">
               <div className="p-1 rounded bg-slate-100 dark:bg-slate-800">
                 <ImageIcon
@@ -877,9 +921,9 @@ export const EvaluationPreview: React.FC = () => {
               </select>
             )}
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+          <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
             {groupedVisibleCreatives.map((group) => (
-              <div key={group.sourceProjectId} className="space-y-1.5">
+              <div key={group.sourceProjectId} className="space-y-1">
                 {sourceProjectOptions.length > 1 && (
                   <div className="px-1 text-[10px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400">
                     {group.sourceProjectName}
@@ -889,13 +933,13 @@ export const EvaluationPreview: React.FC = () => {
                   <button
                     key={creative.id}
                     onClick={() => setSelectedCreativeId(creative.id)}
-                    className={`w-full text-left p-2 rounded-xl border transition-all duration-200 group ${
+                    className={`w-full text-left p-1.5 rounded-lg border transition-all duration-200 group ${
                       selectedCreativeId === creative.id
                         ? "border-indigo-300 dark:border-indigo-600 bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-900/30 dark:to-violet-900/30 shadow-md shadow-indigo-100 dark:shadow-indigo-900/20"
                         : "border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/50 bg-white/80 dark:bg-slate-800/30"
                     }`}
                   >
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-start">
                       <div className="w-12 h-12 flex-shrink-0 bg-slate-100 dark:bg-slate-700 rounded-lg overflow-hidden ring-1 ring-slate-200/50 dark:ring-slate-600/50">
                         <img
                           src={creative.url}
@@ -908,20 +952,22 @@ export const EvaluationPreview: React.FC = () => {
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-slate-800 dark:text-slate-100 truncate leading-tight">
-                          {creative.name}
-                        </p>
-                        {creative.variationName && (
-                          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate leading-tight">
-                            {creative.variationName}
+                        <div className="flex flex-col gap-0 min-w-0">
+                          <p className="text-[11px] font-medium text-slate-800 dark:text-slate-100 truncate leading-none">
+                            {creative.name}
                           </p>
-                        )}
-                        {creative.width && creative.height && (
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono leading-tight">
-                            {creative.width}×{creative.height}
-                          </p>
-                        )}
-                        <div className="mt-1 flex items-center gap-1 flex-wrap">
+                          {creative.variationName && (
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate leading-none">
+                              {creative.variationName}
+                            </p>
+                          )}
+                          {creative.width && creative.height && (
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate leading-none">
+                              {creative.width}×{creative.height}
+                            </p>
+                          )}
+                        </div>
+                        <div className="mt-0 flex items-center gap-1 flex-wrap">
                           {creative.status === "analyzing" && (
                             <span className="flex items-center gap-0.5 text-[9px] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-px rounded-full font-medium">
                               <Loader2 size={8} className="animate-spin" />
@@ -965,23 +1011,25 @@ export const EvaluationPreview: React.FC = () => {
         <div className="flex-1 flex flex-col overflow-hidden min-h-0 min-w-0">
           {selectedCreative ? (
             <>
-              <div className="px-3 py-2 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 flex justify-between items-center">
-                <div>
-                  <h2 className="text-xs font-semibold text-slate-900 dark:text-white leading-tight">
-                    {selectedCreative.name}
-                  </h2>
-                  {selectedCreative.variationName && (
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                      {selectedCreative.variationName}
-                    </p>
-                  )}
-                  {selectedCreative.sourceProjectName && (
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                      {selectedCreative.sourceProjectName}
-                    </p>
-                  )}
+              <div className="px-3 py-1.5 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 flex justify-between items-start gap-2">
+                <div className="min-w-0">
+                  <div className="flex flex-col gap-0 min-w-0">
+                    <h2 className="text-[11px] font-semibold text-slate-900 dark:text-white leading-none truncate">
+                      {selectedCreative.name}
+                    </h2>
+                    {selectedCreative.variationName && (
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-none truncate">
+                        {selectedCreative.variationName}
+                      </p>
+                    )}
+                    {selectedCreative.sourceProjectName && (
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-none truncate">
+                        {selectedCreative.sourceProjectName}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-1.5 shrink-0">
                   {/* Heatmap Toggle */}
                   {selectedCreative.attentionResult?.heatmapUrl && (
                     <button
@@ -991,7 +1039,7 @@ export const EvaluationPreview: React.FC = () => {
                           setHeatmapSliderPosition(5);
                         }
                       }}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-lg font-medium transition-all duration-200 ${
+                      className={`flex items-center gap-1.5 px-2 py-1 text-[10px] rounded-lg font-medium transition-all duration-200 ${
                         showHeatmap
                           ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-md shadow-orange-500/25"
                           : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
@@ -1005,7 +1053,7 @@ export const EvaluationPreview: React.FC = () => {
                     href={selectedCreative.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 transition-colors"
+                    className="text-[10px] text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 transition-colors"
                   >
                     <ExternalLink size={12} />
                     Open
@@ -1821,10 +1869,19 @@ export const EvaluationPreview: React.FC = () => {
                                   key={`${engineGroup.engine}-${group.checkType}`}
                                   className="space-y-2"
                                 >
-                                  <div className="px-1 text-[10px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400">
-                                    {group.checkType}
-                                  </div>
-                                  {group.results.map((res, idx) => {
+                              <div
+                                className={`rounded-2xl border px-3 py-2.5 ${getCheckTypeHeaderClasses(
+                                  group.checkType
+                                )}`}
+                              >
+                                <div className="text-[9px] font-medium uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+                                  Rule Category
+                                </div>
+                                <div className="mt-0.5 text-[13px] font-medium text-slate-700 dark:text-slate-200">
+                                  {group.checkType}
+                                </div>
+                              </div>
+                              {group.results.map((res, idx) => {
                                     const originalIndex =
                                       selectedCreative.complianceResults!.indexOf(res);
                                     const isExpanded = expandedItems.has(originalIndex);
@@ -1874,14 +1931,13 @@ export const EvaluationPreview: React.FC = () => {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                               <div className="flex items-center gap-1 mb-1 flex-wrap">
-                                                {res.engine !== "precision" &&
-                                                  getCategoryBadge(res.category)}
                                                 {getSeverityBadge(res.severity)}
                                                 {(res.engine || "visual") ===
                                                   "visual" &&
                                                   res.relatedElementIds?.length && (
-                                                    <span className="text-[9px] font-semibold px-1.5 py-px rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300 border border-violet-200/60 dark:border-violet-700/50">
-                                                      Highlights image
+                                                    <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-px rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300 border border-violet-200/60 dark:border-violet-700/50">
+                                                      <Eye size={10} />
+                                                      Click highlights image
                                                     </span>
                                                   )}
                                                 {res.ruleSource && (

@@ -55,30 +55,7 @@ const getCreativeSizeLabel = (creative: EvaluationCreative) => {
   return `${creative.width}×${creative.height}`;
 };
 
-const getResultCategoryLabel = (category?: ComplianceResult["category"]) => {
-  if (!category) {
-    return null;
-  }
-
-  return category.charAt(0).toUpperCase() + category.slice(1);
-};
-
-const getResultCategoryBadgeClasses = (category?: ComplianceResult["category"]) => {
-  switch (category) {
-    case "brand":
-      return "border-violet-500/30 bg-violet-500/12 text-violet-200";
-    case "policy":
-      return "border-cyan-500/30 bg-cyan-500/12 text-cyan-200";
-    case "accessibility":
-      return "border-emerald-500/30 bg-emerald-500/12 text-emerald-200";
-    case "quality":
-      return "border-amber-500/30 bg-amber-500/12 text-amber-200";
-    default:
-      return "border-zinc-700 bg-zinc-900 text-zinc-300";
-  }
-};
-
-const getCheckTypeHeaderClasses = (checkType?: string) => {
+const getCheckTypeHeaderTextClasses = (checkType?: string) => {
   const normalized = checkType?.toLowerCase() || "";
 
   if (
@@ -86,7 +63,7 @@ const getCheckTypeHeaderClasses = (checkType?: string) => {
     normalized.includes("type") ||
     normalized.includes("legibility")
   ) {
-    return "border-amber-500/20 bg-amber-500/10";
+    return "text-amber-300";
   }
 
   if (
@@ -94,7 +71,7 @@ const getCheckTypeHeaderClasses = (checkType?: string) => {
     normalized.includes("brand") ||
     normalized.includes("variant")
   ) {
-    return "border-violet-500/20 bg-violet-500/10";
+    return "text-violet-300";
   }
 
   if (
@@ -102,7 +79,7 @@ const getCheckTypeHeaderClasses = (checkType?: string) => {
     normalized.includes("localization") ||
     normalized.includes("content verification")
   ) {
-    return "border-cyan-500/20 bg-cyan-500/10";
+    return "text-cyan-300";
   }
 
   if (
@@ -111,10 +88,10 @@ const getCheckTypeHeaderClasses = (checkType?: string) => {
     normalized.includes("framing") ||
     normalized.includes("safe area")
   ) {
-    return "border-emerald-500/20 bg-emerald-500/10";
+    return "text-emerald-300";
   }
 
-  return "border-zinc-700 bg-zinc-900/70";
+  return "text-zinc-100";
 };
 
 export const ExtensionPanel: React.FC = () => {
@@ -1123,15 +1100,15 @@ export const ExtensionPanel: React.FC = () => {
                           </div>
                           {engineGroup.groups.map((group) => (
                             <div key={`${engineGroup.engine}-${group.checkType}`} className="space-y-3">
-                              <div
-                                className={`rounded-2xl border px-3 py-2.5 ${getCheckTypeHeaderClasses(
-                                  group.checkType
-                                )}`}
-                              >
-                                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                              <div className="px-1 py-0.5">
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
                                   Rule Category
                                 </div>
-                                <div className="mt-1 text-sm font-semibold text-white">
+                                <div
+                                  className={`mt-1 text-sm font-semibold leading-tight ${getCheckTypeHeaderTextClasses(
+                                    group.checkType
+                                  )}`}
+                                >
                                   {group.checkType}
                                 </div>
                               </div>
@@ -1157,20 +1134,6 @@ export const ExtensionPanel: React.FC = () => {
                                           {result.ruleTitle || result.rule}
                                         </div>
                                         <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px]">
-                                          {result.category && (
-                                            <span
-                                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${getResultCategoryBadgeClasses(
-                                                result.category
-                                              )}`}
-                                            >
-                                              <span className="text-[9px] font-semibold uppercase tracking-[0.16em] opacity-70">
-                                                Category
-                                              </span>
-                                              <span className="font-semibold">
-                                                {getResultCategoryLabel(result.category)}
-                                              </span>
-                                            </span>
-                                          )}
                                           <span
                                             className={`px-2 py-1 rounded-full ${
                                               result.status === "PASS"
@@ -1278,15 +1241,15 @@ export const ExtensionPanel: React.FC = () => {
                                     key={`queued-${engineGroup.engine}-${group.checkType}`}
                                     className="space-y-3"
                                   >
-                                    <div
-                                      className={`rounded-2xl border px-3 py-2.5 ${getCheckTypeHeaderClasses(
-                                        group.checkType
-                                      )}`}
-                                    >
-                                      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                                    <div className="px-1 py-0.5">
+                                      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
                                         Rule Category
                                       </div>
-                                      <div className="mt-1 text-sm font-semibold text-white">
+                                      <div
+                                        className={`mt-1 text-sm font-semibold leading-tight ${getCheckTypeHeaderTextClasses(
+                                          group.checkType
+                                        )}`}
+                                      >
                                         {group.checkType}
                                       </div>
                                     </div>

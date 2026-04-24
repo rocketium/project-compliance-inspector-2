@@ -493,38 +493,36 @@ const runBackgroundAnalysis = async ({
 
     await updateJobStatus(jobId, "completed");
 
-    if (source.projectIds.length === 1) {
-      const storedCreatives: StoredCreativeResult[] = results
-        .filter((creative) => creative.complianceResults || creative.analysisResult)
-        .map((creative) => ({
-          creativeId: creative.variationId
-            ? `${creative.variationId}-${creative.dimensionKey}`
-            : creative.id,
-          creativeUrl: creative.url,
-          creativeName: creative.name,
-          dimensionKey: creative.dimensionKey,
-          variationId: creative.variationId,
-          variationName: creative.variationName,
-          width: creative.width,
-          height: creative.height,
-          analysisResult: creative.analysisResult,
-          complianceResults: creative.complianceResults,
-          complianceScores: creative.complianceScores,
-          analyzedAt: new Date().toISOString(),
-          platformId: platform.id,
-        }));
+    const storedCreatives: StoredCreativeResult[] = results
+      .filter((creative) => creative.complianceResults || creative.analysisResult)
+      .map((creative) => ({
+        creativeId: creative.variationId
+          ? `${creative.variationId}-${creative.dimensionKey}`
+          : creative.id,
+        creativeUrl: creative.url,
+        creativeName: creative.name,
+        dimensionKey: creative.dimensionKey,
+        variationId: creative.variationId,
+        variationName: creative.variationName,
+        width: creative.width,
+        height: creative.height,
+        analysisResult: creative.analysisResult,
+        complianceResults: creative.complianceResults,
+        complianceScores: creative.complianceScores,
+        analyzedAt: new Date().toISOString(),
+        platformId: platform.id,
+      }));
 
-      if (storedCreatives.length > 0) {
-        await saveProjectEvaluation(
-          source.projectIds[0],
-          platform.id,
-          storedCreatives,
-          projectName,
-          {
-            evaluationJobId: jobId,
-          }
-        );
-      }
+    if (storedCreatives.length > 0) {
+      await saveProjectEvaluation(
+        source.projectIds[0],
+        platform.id,
+        storedCreatives,
+        projectName,
+        {
+          evaluationJobId: jobId,
+        }
+      );
     }
   } catch (error: any) {
     console.error("Background analysis failed:", error);

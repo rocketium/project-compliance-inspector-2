@@ -47,6 +47,18 @@ export const EvaluationHistory: React.FC = () => {
     return title || "Untitled project";
   };
 
+  const getEvaluationRoute = (evaluation: StoredProjectEvaluation): string => {
+    if (evaluation.evaluationJobId) {
+      return `/preview/${encodeURIComponent(evaluation.evaluationJobId)}`;
+    }
+
+    return evaluation.id
+      ? `/evaluate-project/${evaluation.projectId}?evaluationId=${encodeURIComponent(
+          evaluation.id
+        )}`
+      : `/evaluate-project/${evaluation.projectId}`;
+  };
+
   // Load all evaluations
   useEffect(() => {
     const loadHistory = async () => {
@@ -204,15 +216,7 @@ export const EvaluationHistory: React.FC = () => {
                 return (
                   <div
                     key={evaluation.id || evaluation.projectId}
-                    onClick={() =>
-                      navigate(
-                        evaluation.id
-                          ? `/evaluate-project/${evaluation.projectId}?evaluationId=${encodeURIComponent(
-                              evaluation.id
-                            )}`
-                          : `/evaluate-project/${evaluation.projectId}`
-                      )
-                    }
+                    onClick={() => navigate(getEvaluationRoute(evaluation))}
                     className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
                   >
                     <div className="flex items-start justify-between gap-4">

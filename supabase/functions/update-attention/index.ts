@@ -74,11 +74,6 @@ serve(async (req) => {
       typeof jobData.creatives === "string"
         ? JSON.parse(jobData.creatives || "[]")
         : jobData.creatives || [];
-    const metadata =
-      typeof jobData.metadata === "string"
-        ? JSON.parse(jobData.metadata || "{}")
-        : jobData.metadata || {};
-
     const updatedCreatives = creatives.map((c: any) =>
       c.id === creative_id ? { ...c, attentionResult: attention_result } : c
     );
@@ -107,16 +102,14 @@ serve(async (req) => {
       );
     }
 
-    if ((metadata.sourceProjectIds?.length || 0) === 1) {
-      await saveProjectEvaluationSnapshot({
-        supabase,
-        evaluationJobId: job_id,
-        projectId: jobData.project_id,
-        projectName: jobData.project_name,
-        platformId: jobData.platform_id,
-        creatives: updatedCreatives,
-      });
-    }
+    await saveProjectEvaluationSnapshot({
+      supabase,
+      evaluationJobId: job_id,
+      projectId: jobData.project_id,
+      projectName: jobData.project_name,
+      platformId: jobData.platform_id,
+      creatives: updatedCreatives,
+    });
 
     console.log(
       `[update-attention] ✅ Successfully updated attention for creative ${creative_id}`

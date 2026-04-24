@@ -590,7 +590,7 @@ serve(async (req) => {
         projectId: source.projectIds[0],
         projectName,
         platformId: platform_id,
-        shouldPersistProjectEvaluation: source.projectIds.length === 1,
+        shouldPersistProjectEvaluation: true,
         creatives,
         platformPrompt: promptToUse,
         rules: compiledRules,

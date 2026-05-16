@@ -5,6 +5,8 @@ const path = require('path');
 
 const repoRoot = fs.realpathSync(path.resolve(__dirname, '..'));
 const ignoredDirectories = new Set(['node_modules', '.git']);
+const maxDirectoryDepth = 100;
+const maxOverrideDepth = 100;
 
 const dependencyFields = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
 const exactVersionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -30,19 +32,37 @@ const assertSafePackageJsonPath = packageJsonPath => {
 
 const findPackageJsonFiles = directory => {
 	const packageJsonFiles = [];
+	const directoriesToVisit = [{ directory, depth: 0 }];
+	const visitedDirectories = new Set();
 
-	for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-		const entryPath = path.resolve(directory, entry.name);
-		const relativePath = path.relative(directory, entryPath);
+	while (directoriesToVisit.length > 0) {
+		const { directory: currentDirectory, depth } = directoriesToVisit.pop();
+		const realDirectory = fs.realpathSync(currentDirectory);
 
-		if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) continue;
-
-		if (entry.isDirectory()) {
-			if (!ignoredDirectories.has(entry.name)) packageJsonFiles.push(...findPackageJsonFiles(entryPath));
-			continue;
+		if (!isInsideRepo(realDirectory)) {
+			throw new Error(`Refusing to scan unsafe directory path: ${currentDirectory}`);
 		}
 
-		if (entry.isFile() && entry.name === 'package.json') packageJsonFiles.push(entryPath);
+		if (visitedDirectories.has(realDirectory)) continue;
+		visitedDirectories.add(realDirectory);
+
+		if (depth > maxDirectoryDepth) {
+			throw new Error(`Refusing to scan directory tree deeper than ${maxDirectoryDepth}: ${currentDirectory}`);
+		}
+
+		for (const entry of fs.readdirSync(currentDirectory, { withFileTypes: true })) {
+			const entryPath = path.resolve(currentDirectory, entry.name);
+			const relativePath = path.relative(currentDirectory, entryPath);
+
+			if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) continue;
+
+			if (entry.isDirectory()) {
+				if (!ignoredDirectories.has(entry.name)) directoriesToVisit.push({ directory: entryPath, depth: depth + 1 });
+				continue;
+			}
+
+			if (entry.isFile() && entry.name === 'package.json') packageJsonFiles.push(entryPath);
+		}
 	}
 
 	return packageJsonFiles;
@@ -55,15 +75,31 @@ const checkVersion = (path, version) => {
 };
 
 const checkOverrideVersions = (overrides, pathPrefix) => {
-	for (const [name, value] of Object.entries(overrides)) {
-		const childPath = `${pathPrefix}.${name}`;
+	const objectsToCheck = [{ value: overrides, pathPrefix, depth: 0 }];
+	const visitedObjects = new WeakSet();
 
-		if (typeof value === 'string') {
-			checkVersion(childPath, value);
-			continue;
+	while (objectsToCheck.length > 0) {
+		const { value: currentValue, pathPrefix: currentPathPrefix, depth } = objectsToCheck.pop();
+
+		if (!currentValue || typeof currentValue !== 'object') continue;
+
+		if (visitedObjects.has(currentValue)) continue;
+		visitedObjects.add(currentValue);
+
+		if (depth > maxOverrideDepth) {
+			throw new Error(`Refusing to scan overrides deeper than ${maxOverrideDepth}: ${currentPathPrefix}`);
 		}
 
-		checkOverrideVersions(value, childPath);
+		for (const [name, value] of Object.entries(currentValue)) {
+			const childPath = `${currentPathPrefix}.${name}`;
+
+			if (typeof value === 'string') {
+				checkVersion(childPath, value);
+				continue;
+			}
+
+			objectsToCheck.push({ value, pathPrefix: childPath, depth: depth + 1 });
+		}
 	}
 };
 

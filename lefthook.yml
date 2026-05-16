@@ -1,0 +1,3 @@
+pre-push:
+  jobs:
+    - run: npm run check:exact-versions

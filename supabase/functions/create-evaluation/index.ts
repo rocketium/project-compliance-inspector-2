@@ -30,6 +30,55 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const jsonResponse = (
+  body: Record<string, unknown>,
+  status: number,
+) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const requireRocketiumUser = async (req: Request, supabase: any) => {
+  const authorization = req.headers.get("authorization") || "";
+  const token = authorization.replace(/^Bearer\s+/i, "").trim();
+
+  if (!token) {
+    return {
+      response: jsonResponse(
+        { success: false, error: "Authentication is required" },
+        401,
+      ),
+    };
+  }
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
+  const email = user?.email?.toLowerCase() || "";
+
+  if (error || !user || !email) {
+    return {
+      response: jsonResponse(
+        { success: false, error: "Invalid authentication token" },
+        401,
+      ),
+    };
+  }
+
+  if (!email.endsWith("@rocketium.com")) {
+    return {
+      response: jsonResponse(
+        { success: false, error: "Only @rocketium.com users can create evaluations" },
+        403,
+      ),
+    };
+  }
+
+  return { user };
+};
+
 const generateShareableId = (): string => {
   const timestamp = Date.now().toString(36);
   const randomPart = Math.random().toString(36).substring(2, 10);
@@ -447,6 +496,10 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+    const authResult = await requireRocketiumUser(req, supabase);
+    if ("response" in authResult) {
+      return authResult.response;
+    }
 
     const body = await req.json();
     const {

@@ -1,14 +1,29 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { Session, User } from "@supabase/supabase-js";
+import { createAppUrl, getCurrentAppPathAndSearch } from "../lib/appUrl";
+import { isSupabaseConfigured, supabase, supabaseConfigError } from "../lib/supabase";
+
+const ROCKETIUM_EMAIL_SUFFIX = "@rocketium.com";
+
+export const isRocketiumEmail = (email?: string | null) =>
+  Boolean(email?.trim().toLowerCase().endsWith(ROCKETIUM_EMAIL_SUFFIX));
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string) => Promise<{ error: any }>;
+  authError: string | null;
+  isRocketiumUser: boolean;
+  signInWithGoogle: (redirectTo?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  clearAuthError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,92 +36,133 @@ export const useAuth = () => {
   return context;
 };
 
+const getCurrentRedirectUrl = () => {
+  return createAppUrl(getCurrentAppPathAndSearch());
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  // Authentication disabled - using mock user
-  const mockUser = {
-    id: "mock-user-id",
-    email: "demo@local.dev",
-    app_metadata: {},
-    user_metadata: {},
-    aud: "authenticated",
-    created_at: new Date().toISOString(),
-  } as User;
-
-  const [user, setUser] = useState<User | null>(mockUser);
+  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Authentication disabled - no-op
-    // Original authentication code commented out for easy re-enabling
-    /*
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      // Validate email domain on session load
-      if (
-        session?.user?.email &&
-        !session.user.email.endsWith("@rocketium.com")
-      ) {
-        // Sign out if email doesn't match domain
-        supabase.auth.signOut();
+    let isMounted = true;
+
+    if (!isSupabaseConfigured) {
+      setAuthError(supabaseConfigError);
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const applySession = async (nextSession: Session | null) => {
+      if (!isMounted) return;
+
+      if (!nextSession) {
         setSession(null);
         setUser(null);
-      } else {
-        setSession(session);
-        setUser(session?.user ?? null);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-    });
 
-    // Listen for auth changes
+      const email = nextSession.user.email;
+      if (!isRocketiumEmail(email)) {
+        setSession(null);
+        setUser(null);
+        setAuthError("Only @rocketium.com Google accounts can access Rocketium Review.");
+        setLoading(false);
+        await supabase.auth.signOut();
+        return;
+      }
+
+      setAuthError(null);
+      setSession(nextSession);
+      setUser(nextSession.user);
+      setLoading(false);
+    };
+
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (error) {
+          setAuthError(error.message);
+          setLoading(false);
+          return;
+        }
+        void applySession(data.session);
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setAuthError(error.message || "Failed to load authentication session.");
+        setLoading(false);
+      });
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      // Validate email domain on auth state change
-      if (
-        session?.user?.email &&
-        !session.user.email.endsWith("@rocketium.com")
-      ) {
-        // Sign out if email doesn't match domain
-        supabase.auth.signOut();
-        setSession(null);
-        setUser(null);
-      } else {
-        setSession(session);
-        setUser(session?.user ?? null);
-      }
-      setLoading(false);
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      void applySession(nextSession);
     });
 
-    return () => subscription.unsubscribe();
-    */
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    // Authentication disabled - no-op
-    return { error: null };
-  };
+  const signInWithGoogle = useCallback(async (redirectTo?: string) => {
+    setAuthError(null);
+    if (!isSupabaseConfigured) {
+      const error = { message: supabaseConfigError || "Supabase is not configured." };
+      setAuthError(error.message);
+      return { error };
+    }
 
-  const signUp = async (email: string, password: string) => {
-    // Authentication disabled - no-op
-    return { error: null };
-  };
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: redirectTo || getCurrentRedirectUrl(),
+        queryParams: {
+          hd: "rocketium.com",
+          prompt: "select_account",
+        },
+      },
+    });
 
-  const signOut = async () => {
-    // Authentication disabled - no-op
-    console.log("Sign out called (authentication disabled)");
-  };
+    if (error) {
+      setAuthError(error.message);
+    }
 
-  const value = {
-    user,
-    session,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-  };
+    return { error };
+  }, []);
+
+  const signOut = useCallback(async () => {
+    setAuthError(null);
+    await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
+  }, []);
+
+  const clearAuthError = useCallback(() => setAuthError(null), []);
+
+  const value = useMemo(
+    () => ({
+      user,
+      session,
+      loading,
+      authError,
+      isRocketiumUser: isRocketiumEmail(user?.email),
+      signInWithGoogle,
+      signOut,
+      clearAuthError,
+    }),
+    [authError, clearAuthError, loading, session, signInWithGoogle, signOut, user]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -14,8 +14,20 @@
           <h1>Rocketium Review</h1>
         </div>
         <div class="topbar-actions">
-          <button id="settings-toggle" class="ghost" title="Settings" aria-label="Settings">⚙</button>
-          <button id="refresh-tab" class="secondary" title="Refresh" aria-label="Refresh">↻</button>
+          <button id="settings-toggle" class="ghost icon-button" title="Settings" aria-label="Settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+              <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05a2.1 2.1 0 0 1-2.97 2.97l-.05-.05a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.1 1.65V21.3a2.1 2.1 0 0 1-4.2 0v-.07a1.8 1.8 0 0 0-1.1-1.65 1.8 1.8 0 0 0-1.98.36l-.05.05a2.1 2.1 0 0 1-2.97-2.97l.05-.05A1.8 1.8 0 0 0 4.6 15a1.8 1.8 0 0 0-1.65-1.1H2.9a2.1 2.1 0 0 1 0-4.2h.07A1.8 1.8 0 0 0 4.6 8a1.8 1.8 0 0 0-.36-1.98l-.05-.05A2.1 2.1 0 1 1 7.16 3l.05.05A1.8 1.8 0 0 0 9.2 3.4 1.8 1.8 0 0 0 10.3 1.75V1.7a2.1 2.1 0 0 1 4.2 0v.07A1.8 1.8 0 0 0 15.6 3.4a1.8 1.8 0 0 0 1.98-.36l.05-.05a2.1 2.1 0 1 1 2.97 2.97l-.05.05A1.8 1.8 0 0 0 19.4 8c.14.44.36.78.67 1.04.3.25.69.39 1.15.39h.08a2.1 2.1 0 0 1 0 4.2h-.08A1.8 1.8 0 0 0 19.4 15Z" />
+            </svg>
+          </button>
+          <button id="refresh-tab" class="secondary icon-button" title="Refresh" aria-label="Refresh">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 11a8.1 8.1 0 0 0-14.2-5.3L4 7.5" />
+              <path d="M4 4v3.5h3.5" />
+              <path d="M4 13a8.1 8.1 0 0 0 14.2 5.3L20 16.5" />
+              <path d="M20 20v-3.5h-3.5" />
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -25,7 +37,7 @@
           <input
             id="app-base-url"
             type="text"
-            placeholder="http://localhost:3000"
+            placeholder="https://compliance.rocketiumlabs.com"
           />
           <button id="save-base-url" class="primary">Save</button>
         </div>

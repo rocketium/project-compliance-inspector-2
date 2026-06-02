@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.get-evaluation]
 verify_jwt = false
+
+[functions.update-attention]
+verify_jwt = false

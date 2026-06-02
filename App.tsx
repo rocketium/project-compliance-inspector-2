@@ -30,6 +30,8 @@ import {
   Check,
   ExternalLink,
   Loader2,
+  ShieldCheck,
+  UserCircle,
 } from "lucide-react";
 import { ConfigProvider, theme as antdTheme } from "antd";
 import { AdminPanel } from "./components/AdminPanel";
@@ -65,8 +67,68 @@ const ThemeToggle: React.FC = () => {
   );
 };
 
+const AuthLoading: React.FC = () => (
+  <div className="min-h-[100dvh] bg-slate-50 dark:bg-zinc-950 flex items-center justify-center">
+    <div className="text-center">
+      <div className="mx-auto mb-4 h-12 w-12 rounded-full border-4 border-slate-200 border-t-zinc-950 animate-spin dark:border-zinc-800 dark:border-t-zinc-100" />
+      <p className="text-sm font-medium text-slate-600 dark:text-zinc-400">
+        Checking access...
+      </p>
+    </div>
+  </div>
+);
+
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { loading, user } = useAuth();
+
+  if (loading) {
+    return <AuthLoading />;
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
+  return <>{children}</>;
+};
+
+const SettingsPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [platforms, setPlatforms] =
+    useState<PlatformConfig[]>(DEFAULT_PLATFORMS);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadPlatforms()
+      .then((loadedPlatforms) => {
+        if (isMounted) {
+          setPlatforms(loadedPlatforms);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPlatforms(DEFAULT_PLATFORMS);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-slate-100 dark:bg-zinc-950">
+      <AdminPanel
+        onClose={() => navigate("/")}
+        currentPlatforms={platforms}
+      />
+    </div>
+  );
+};
+
 const AppContent: React.FC = () => {
-  // const { user, loading: authLoading, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -76,7 +138,6 @@ const AppContent: React.FC = () => {
   );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [thinkingTime, setThinkingTime] = useState(0);
-  const [showAdmin, setShowAdmin] = useState(false);
   const [showPlatformDropdown, setShowPlatformDropdown] = useState(false);
   const [complianceResults, setComplianceResults] = useState<
     ComplianceResult[] | null
@@ -130,12 +191,7 @@ const AppContent: React.FC = () => {
       window.history.replaceState({}, "", newUrl);
     }
 
-    // 3. Check routing
-    if (window.location.pathname === "/admin") {
-      setShowAdmin(true);
-    }
-
-    // 4. Restore from localStorage if available
+    // 3. Restore from localStorage if available
     try {
       const savedData = localStorage.getItem("adAnalyzerResults");
       if (savedData) {
@@ -379,70 +435,39 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // // Show loading state while checking authentication
-  // if (authLoading) {
-  //   return (
-  //     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-  //       <div className="text-center">
-  //         <div className="w-16 h-16 border-4 border-slate-200 dark:border-slate-700 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
-  //         <p className="text-slate-600 dark:text-slate-400">Loading...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
-
-  // Show login page if not authenticated
-  // if (!user) {
-  //   return <Login />;
-  // }
-
-  // Render Admin Panel
-  if (showAdmin) {
-    return (
-      <div className="min-h-screen bg-slate-100 dark:bg-zinc-950">
-        <AdminPanel
-          onClose={() => {
-            setShowAdmin(false);
-            window.history.pushState({}, "", "/");
-            fetchConfig(); // Refresh data
-          }}
-          currentPlatforms={platforms}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col transition-colors">
       {/* Header */}
-      <header className="bg-white dark:bg-zinc-950 border-b border-slate-200 dark:border-zinc-800 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="shrink-0 flex items-center justify-center">
+      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95 dark:shadow-black/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="shrink-0 flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 shadow-inner dark:border-zinc-800 dark:bg-zinc-900">
               <img
                 src="/eye-ai-review.svg"
                 alt="Rocketium Review"
                 className="block h-7 w-auto object-contain -translate-y-0.5"
               />
             </div>
-            <h1 className="flex items-center text-xl font-bold text-slate-800 dark:text-zinc-100 tracking-tight leading-none">
-              Rocketium Review
-            </h1>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-xl font-semibold tracking-tight text-slate-950 dark:text-zinc-100">
+                  Rocketium Review
+                </h1>
+                <span className="hidden items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 sm:inline-flex dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+                  <ShieldCheck size={12} />
+                  Verified
+                </span>
+              </div>
+              <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-zinc-500">
+                Compliance workspace for Rocketium creatives
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            {/* User Email */}
-            {/* <span className="text-sm text-slate-600 dark:text-slate-400 hidden sm:block">
-              {user?.email}
-            </span> */}
-
-            {/* Sign Out Button */}
-            {/* <button
-              onClick={signOut}
-              className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"
-              title="Sign Out"
-            >
-              <LogOut size={20} />
-            </button> */}
+          <div className="flex min-w-0 flex-wrap items-center gap-2 lg:justify-end">
+            <div className="hidden max-w-[260px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm sm:flex dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
+              <UserCircle size={16} className="shrink-0 text-slate-400 dark:text-zinc-500" />
+              <span className="truncate">{user?.email}</span>
+            </div>
 
             {/* Platform Dropdown */}
             <div className="relative">
@@ -545,7 +570,7 @@ const AppContent: React.FC = () => {
             {/* History Button */}
             <button
               onClick={() => navigate("/history")}
-              className="p-1.5 rounded-lg bg-slate-100/80 dark:bg-zinc-900 hover:bg-slate-200/80 dark:hover:bg-zinc-800 transition-all duration-200 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200 backdrop-blur-sm"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               title="View History"
             >
               <History size={18} />
@@ -553,11 +578,19 @@ const AppContent: React.FC = () => {
             <ThemeToggle />
 
             <button
-              onClick={() => setShowAdmin(true)}
-              className="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors p-2 hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-full"
+              onClick={() => navigate("/admin")}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               title="Settings"
             >
-              <Settings size={20} />
+              <Settings size={18} />
+            </button>
+
+            <button
+              onClick={signOut}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-rose-50 hover:text-rose-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              title="Sign out"
+            >
+              <LogOut size={18} />
             </button>
           </div>
         </div>
@@ -922,14 +955,47 @@ const ThemedApp: React.FC = () => {
       }}
     >
       <Routes>
-        <Route path="/" element={<AppContent />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <AppContent />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/evaluate-project/:projectId"
-          element={<EvaluateProject />}
+          element={
+            <ProtectedRoute>
+              <EvaluateProject />
+            </ProtectedRoute>
+          }
         />
         <Route path="/preview/:jobId" element={<EvaluationPreview />} />
-        <Route path="/history" element={<EvaluationHistory />} />
-        <Route path="/extension-panel" element={<ExtensionPanel />} />
+        <Route
+          path="/history"
+          element={
+            <ProtectedRoute>
+              <EvaluationHistory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/extension-panel"
+          element={
+            <ProtectedRoute>
+              <ExtensionPanel />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </ConfigProvider>
   );

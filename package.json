@@ -20,18 +20,26 @@
     "mongodb": "6.21.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "react-router-dom": "7.10.1"
+    "react-router-dom": "7.15.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.17",
     "@types/node": "22.19.1",
     "@vitejs/plugin-react": "5.1.1",
     "autoprefixer": "10.4.22",
-    "postcss": "8.5.6",
+    "postcss": "8.5.15",
     "tailwindcss": "4.1.17",
     "typescript": "5.8.3",
-    "vite": "6.4.1",
+    "vite": "6.4.2",
     "lefthook": "1.13.6"
+  },
+  "overrides": {
+    "brace-expansion": "2.1.1",
+    "jws": "4.0.1",
+    "minimatch": "9.0.9",
+    "picomatch": "4.0.4",
+    "rollup": "4.60.4",
+    "ws": "8.21.0"
   },
   "engines": {
     "npm": ">=11.12.1",

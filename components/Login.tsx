@@ -1,260 +1,108 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { AlertCircle, ExternalLink, LogIn, ShieldCheck, Sparkles } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { Sparkles, Mail, Lock, AlertCircle, CheckCircle } from "lucide-react";
-
-type AuthMode = "signin" | "signup";
+import { createAppUrl, getCurrentAppPathAndSearch } from "../lib/appUrl";
 
 export const Login: React.FC = () => {
-  const [mode, setMode] = useState<AuthMode>("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const { authError, clearAuthError, signInWithGoogle } = useAuth();
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(null);
-    setLoading(true);
+  const isEmbedded = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return window.parent !== window;
+  }, []);
 
-    // Validate email domain before submission
-    if (!email.endsWith("@rocketium.com")) {
-      setError("Only @rocketium.com email addresses are allowed.");
-      setLoading(false);
+  const handleGoogleSignIn = async () => {
+    clearAuthError();
+    setLocalError(null);
+
+    if (isEmbedded) {
+      window.open(
+        createAppUrl(getCurrentAppPathAndSearch()),
+        "_blank",
+        "noopener,noreferrer"
+      );
       return;
     }
 
-    // Validate password confirmation for signup
-    if (mode === "signup") {
-      if (password.length < 6) {
-        setError("Password must be at least 6 characters long.");
-        setLoading(false);
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError("Passwords do not match.");
-        setLoading(false);
-        return;
-      }
+    setIsSigningIn(true);
+    const { error } = await signInWithGoogle();
+    if (error) {
+      setLocalError(error.message || "Unable to start Google sign-in.");
+      setIsSigningIn(false);
     }
-
-    if (mode === "signin") {
-      const { error: signInError } = await signIn(email, password);
-      if (signInError) {
-        setError(
-          signInError.message ||
-            "Failed to sign in. Please check your credentials."
-        );
-      }
-    } else {
-      const { error: signUpError } = await signUp(email, password);
-      if (signUpError) {
-        setError(
-          signUpError.message || "Failed to create account. Please try again."
-        );
-      } else {
-        setSuccess(
-          "Account created successfully! Please check your email to verify your account."
-        );
-        // Reset form
-        setPassword("");
-        setConfirmPassword("");
-      }
-    }
-
-    setLoading(false);
   };
 
+  const visibleError = localError || authError;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        {/* Logo and Title */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl mb-4 shadow-lg">
-            <Sparkles className="text-white h-8 w-8" />
+    <div className="min-h-[100dvh] bg-slate-50 dark:bg-zinc-950 flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-[460px]">
+        <div className="mb-8">
+          <div className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 py-3 shadow-sm">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-950 dark:bg-zinc-100">
+              <Sparkles className="h-5 w-5 text-white dark:text-zinc-950" />
+            </span>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-zinc-500">
+                Protected Workspace
+              </p>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-950 dark:text-zinc-100">
+                Rocketium Review
+              </h1>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">
-            Rocketium AI
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400">
-            {mode === "signin"
-              ? "Sign in to access the compliance inspector"
-              : "Create your account"}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
+          <div className="mb-6">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-zinc-900 dark:text-zinc-200">
+              <ShieldCheck className="h-6 w-6" />
+            </div>
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-zinc-100">
+              Sign in with Google
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-zinc-400">
+              Access is limited to verified Rocketium Google accounts.
+            </p>
+          </div>
+
+          {visibleError && (
+            <div className="mb-5 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              <span>{visibleError}</span>
+            </div>
+          )}
+
+          {isEmbedded && (
+            <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+              Google sign-in opens in the main app tab. After signing in, refresh the side panel.
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={isSigningIn}
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white dark:disabled:bg-zinc-700 dark:disabled:text-zinc-400"
+          >
+            {isEmbedded ? (
+              <ExternalLink className="h-4 w-4" />
+            ) : (
+              <LogIn className="h-4 w-4" />
+            )}
+            {isSigningIn
+              ? "Opening Google..."
+              : isEmbedded
+              ? "Open Sign-In Tab"
+              : "Continue With Google"}
+          </button>
+
+          <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-zinc-500">
+            Non-Rocketium accounts are automatically signed out.
           </p>
         </div>
-
-        {/* Mode Toggle */}
-        <div className="mb-6 flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("signin");
-              setError(null);
-              setSuccess(null);
-              setPassword("");
-              setConfirmPassword("");
-            }}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              mode === "signin"
-                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("signup");
-              setError(null);
-              setSuccess(null);
-              setPassword("");
-              setConfirmPassword("");
-            }}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              mode === "signup"
-                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-            }`}
-          >
-            Sign Up
-          </button>
-        </div>
-
-        {/* Login Card */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
-              >
-                Email Address
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your.name@rocketium.com"
-                  required
-                  className="block w-full pl-10 pr-3 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-              </div>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Only @rocketium.com emails are allowed
-              </p>
-            </div>
-
-            {/* Password Field */}
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
-              >
-                Password
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={
-                    mode === "signup"
-                      ? "Create a password (min 6 characters)"
-                      : "Enter your password"
-                  }
-                  required
-                  minLength={mode === "signup" ? 6 : undefined}
-                  className="block w-full pl-10 pr-3 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-              </div>
-              {mode === "signup" && (
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Password must be at least 6 characters long
-                </p>
-              )}
-            </div>
-
-            {/* Confirm Password Field (Signup only) */}
-            {mode === "signup" && (
-              <div>
-                <label
-                  htmlFor="confirmPassword"
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
-                >
-                  Confirm Password
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-slate-400" />
-                  </div>
-                  <input
-                    id="confirmPassword"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm your password"
-                    required
-                    className="block w-full pl-10 pr-3 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Success Message */}
-            {success && (
-              <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm">
-                <CheckCircle className="h-4 w-4 flex-shrink-0" />
-                <span>{success}</span>
-              </div>
-            )}
-
-            {/* Error Message */}
-            {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  {mode === "signin" ? "Signing in..." : "Creating account..."}
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  {mode === "signin" ? "Sign In" : "Create Account"}
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-
-        {/* Footer */}
-        <p className="text-center mt-6 text-sm text-slate-500 dark:text-slate-400">
-          Protected access for Rocketium team members only
-        </p>
       </div>
     </div>
   );

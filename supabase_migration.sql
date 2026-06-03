@@ -25,10 +25,23 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_project_evaluations_evaluation_job_id ON p
 -- Enable Row Level Security
 ALTER TABLE project_evaluations ENABLE ROW LEVEL SECURITY;
 
--- Allow all operations (adjust based on your auth needs)
+-- Domain gate used by RLS. Supabase Auth includes the signed-in user's email in
+-- auth.jwt(), and the client rejects non-Rocketium accounts as well.
+CREATE OR REPLACE FUNCTION public.is_rocketium_auth_user()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT lower(coalesce(auth.jwt() ->> 'email', '')) LIKE '%@rocketium.com';
+$$;
+
+-- Only authenticated Rocketium users can access saved project evaluations.
 DROP POLICY IF EXISTS "Allow all operations" ON project_evaluations;
-CREATE POLICY "Allow all operations" ON project_evaluations
-  FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Rocketium users can manage project evaluations" ON project_evaluations;
+CREATE POLICY "Rocketium users can manage project evaluations" ON project_evaluations
+  FOR ALL TO authenticated
+  USING (public.is_rocketium_auth_user())
+  WITH CHECK (public.is_rocketium_auth_user());
 
 -- Migration: Add project_name column if table already exists
 -- Run this if you have an existing table without project_name:
@@ -61,10 +74,14 @@ CREATE INDEX IF NOT EXISTS idx_evaluation_jobs_created_at ON evaluation_jobs(cre
 -- Enable Row Level Security
 ALTER TABLE evaluation_jobs ENABLE ROW LEVEL SECURITY;
 
--- Allow all operations (adjust based on your auth needs)
+-- Direct table access is private. Public preview links are served through the
+-- get-evaluation edge function, which fetches one requested job with service role.
 DROP POLICY IF EXISTS "Allow all operations on evaluation_jobs" ON evaluation_jobs;
-CREATE POLICY "Allow all operations on evaluation_jobs" ON evaluation_jobs
-  FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Rocketium users can manage evaluation_jobs" ON evaluation_jobs;
+CREATE POLICY "Rocketium users can manage evaluation_jobs" ON evaluation_jobs
+  FOR ALL TO authenticated
+  USING (public.is_rocketium_auth_user())
+  WITH CHECK (public.is_rocketium_auth_user());
 
 -- Enable realtime for this table (required for live updates)
 ALTER PUBLICATION supabase_realtime ADD TABLE evaluation_jobs;
@@ -95,9 +112,15 @@ ALTER TABLE platform_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE brand_configs ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Allow all operations on platform_configs" ON platform_configs;
-CREATE POLICY "Allow all operations on platform_configs" ON platform_configs
-  FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Rocketium users can manage platform_configs" ON platform_configs;
+CREATE POLICY "Rocketium users can manage platform_configs" ON platform_configs
+  FOR ALL TO authenticated
+  USING (public.is_rocketium_auth_user())
+  WITH CHECK (public.is_rocketium_auth_user());
 
 DROP POLICY IF EXISTS "Allow all operations on brand_configs" ON brand_configs;
-CREATE POLICY "Allow all operations on brand_configs" ON brand_configs
-  FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Rocketium users can manage brand_configs" ON brand_configs;
+CREATE POLICY "Rocketium users can manage brand_configs" ON brand_configs
+  FOR ALL TO authenticated
+  USING (public.is_rocketium_auth_user())
+  WITH CHECK (public.is_rocketium_auth_user());

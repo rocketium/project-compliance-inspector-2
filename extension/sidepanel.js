@@ -1,4 +1,4 @@
-const DEFAULT_APP_BASE_URL = "http://localhost:3000";
+const DEFAULT_APP_BASE_URL = "https://compliance.rocketiumlabs.com";
 const storageKey = "rocketiumQcAppBaseUrl";
 const userIdStorageKey = "rocketiumQcOverrideUserId";
 const sessionIdStorageKey = "rocketiumQcOverrideSessionId";

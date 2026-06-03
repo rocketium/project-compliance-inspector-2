@@ -46,6 +46,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
+import { useAuth } from "../contexts/AuthContext";
 import { ZoomPanControls } from "./ZoomPanControls";
 import { groupResultsByCheckType, groupResultsByEngineAndCheckType } from "../lib/ruleBundle";
 
@@ -167,6 +168,7 @@ const ScoreRing = ({
 export const EvaluationPreview: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // State
   const [job, setJob] = useState<EvaluationJob | null>(null);
@@ -473,6 +475,10 @@ export const EvaluationPreview: React.FC = () => {
   // Analyze attention for the selected creative
   const analyzeAttention = async (creativeId: string) => {
     if (!job || !jobId) return;
+    if (!user) {
+      console.warn("Sign in with a Rocketium account to update attention results.");
+      return;
+    }
 
     const creative = job.creatives.find((c) => c.id === creativeId);
     if (!creative || analyzingAttentionIds.has(creativeId)) return;
@@ -1574,7 +1580,8 @@ export const EvaluationPreview: React.FC = () => {
                       <div className="p-2.5 border-t border-slate-200/50 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-800/30">
                         <button
                           onClick={() => analyzeAttention(selectedCreative.id)}
-                          disabled={isAnalyzingAttention}
+                          disabled={isAnalyzingAttention || !user}
+                          title={!user ? "Sign in to update attention results" : undefined}
                           className="w-full py-1.5 text-[11px] text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 font-medium flex items-center justify-center gap-1.5 disabled:opacity-50 bg-orange-50 dark:bg-orange-900/20 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-all duration-200"
                         >
                           {isAnalyzingAttention ? (
@@ -1603,7 +1610,8 @@ export const EvaluationPreview: React.FC = () => {
                       </p>
                       <button
                         onClick={() => analyzeAttention(selectedCreative.id)}
-                        disabled={isAnalyzingAttention}
+                        disabled={isAnalyzingAttention || !user}
+                        title={!user ? "Sign in to update attention results" : undefined}
                         className="px-4 py-2 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 disabled:from-orange-400 disabled:to-rose-400 text-white rounded-xl text-xs font-medium shadow-md shadow-orange-500/25 hover:shadow-orange-500/40 transition-all duration-200 flex items-center gap-1.5"
                       >
                         {isAnalyzingAttention ? (

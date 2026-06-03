@@ -9,6 +9,7 @@ import {
   saveProjectEvaluation,
 } from "./projectEvaluation";
 import { DEFAULT_PLATFORMS } from "../constants/platforms";
+import { createAppUrl, getRuntimeAppBaseUrl } from "../lib/appUrl";
 import { getFetchableAssetUrl } from "../lib/assetProxy";
 import { extractProjectIdFromUrl, parseRocketiumSource } from "../lib/rocketiumSource";
 import { buildEvaluationRules, buildPromptLayerConfig } from "../lib/ruleBundle";
@@ -118,8 +119,7 @@ const getApiBaseUrl = () => {
 };
 
 const getAppBaseUrl = () => {
-  if (typeof window === "undefined") return "";
-  return window.location.origin;
+  return getRuntimeAppBaseUrl();
 };
 
 const getSupabaseFunctionBase = () => {
@@ -134,6 +134,31 @@ const getSupabaseFunctionBase = () => {
   return {
     url: `${supabaseUrl}/functions/v1`,
     anonKey: supabaseAnonKey,
+  };
+};
+
+const getFunctionHeaders = async (requireAuth = false) => {
+  const functionBase = getSupabaseFunctionBase();
+  if (!functionBase) {
+    throw new Error("Supabase function configuration is missing");
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token || (!requireAuth ? functionBase.anonKey : "");
+
+  if (!token) {
+    throw new Error("Please sign in with a Rocketium Google account.");
+  }
+
+  return {
+    functionBase,
+    headers: {
+      "Content-Type": "application/json",
+      apikey: functionBase.anonKey,
+      Authorization: `Bearer ${token}`,
+    },
   };
 };
 
@@ -547,17 +572,11 @@ const createEvaluationJobViaFunction = async ({
   rocketiumUserId?: string;
   rocketiumSessionId?: string;
 }) => {
-  const functionBase = getSupabaseFunctionBase();
-  if (!functionBase) {
-    throw new Error("Supabase function configuration is missing");
-  }
+  const { functionBase, headers } = await getFunctionHeaders(true);
 
   const response = await fetch(`${functionBase.url}/create-evaluation`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${functionBase.anonKey}`,
-    },
+    headers,
     body: JSON.stringify({
       project_link: projectLink,
       platform_id: platform.id,
@@ -647,7 +666,7 @@ const createEvaluationJobLocally = async ({
 
     return {
       success: true,
-      shareableUrl: `${getAppBaseUrl()}/preview/${jobId}`,
+      shareableUrl: createAppUrl(`/preview/${jobId}`),
       jobId,
     };
   } catch (error: any) {
@@ -719,6 +738,28 @@ export const loadEvaluationJob = async (
   jobId: string
 ): Promise<{ success: boolean; data?: EvaluationJob; error?: string }> => {
   try {
+    try {
+      const { functionBase, headers } = await getFunctionHeaders(false);
+      const response = await fetch(
+        `${functionBase.url}/get-evaluation?job_id=${encodeURIComponent(jobId)}`,
+        {
+          method: "GET",
+          headers,
+        }
+      );
+      const payload = await response.json();
+
+      if (!response.ok || !payload.success) {
+        throw new Error(
+          payload.error || `Failed to load evaluation (${response.status})`
+        );
+      }
+
+      return { success: true, data: parseEvaluationJobRecord(payload.data) };
+    } catch (functionError) {
+      console.warn("Falling back to direct evaluation job load:", functionError);
+    }
+
     const { data, error } = await supabase
       .from("evaluation_jobs")
       .select("*")
@@ -770,18 +811,11 @@ export const updateJobCreativeAttention = async (
   attentionResult: AttentionInsightResult
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    const functionBase = getSupabaseFunctionBase();
-
-    if (!functionBase) {
-      throw new Error("Missing Supabase environment variables");
-    }
+    const { functionBase, headers } = await getFunctionHeaders(true);
 
     const response = await fetch(`${functionBase.url}/update-attention`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${functionBase.anonKey}`,
-      },
+      headers,
       body: JSON.stringify({
         job_id: jobId,
         creative_id: creativeId,

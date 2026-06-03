@@ -6,6 +6,19 @@ const normalizeBaseUrl = (value?: string | null) => {
   return trimmed.replace(/\/+$/, "");
 };
 
+const getPathAndSearchFromUrl = (value?: string | null) => {
+  if (!value) {
+    return "/";
+  }
+
+  try {
+    const parsed = new URL(value, getConfiguredAppBaseUrl());
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return value.startsWith("/") ? value : "/";
+  }
+};
+
 export const getConfiguredAppBaseUrl = () =>
   normalizeBaseUrl((import.meta as any).env?.VITE_APP_BASE_URL) ||
   DEFAULT_PRODUCTION_APP_BASE_URL;
@@ -34,6 +47,14 @@ export const createAppUrl = (pathAndSearch = "/") => {
   }
 
   return `${baseUrl}${normalizedPath}`;
+};
+
+export const createCanonicalRedirectUrl = (redirectTo?: string | null) => {
+  const pathAndSearch = redirectTo
+    ? getPathAndSearchFromUrl(redirectTo)
+    : getCurrentAppPathAndSearch();
+
+  return createAppUrl(pathAndSearch);
 };
 
 export const getCurrentAppPathAndSearch = () => {

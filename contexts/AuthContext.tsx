@@ -7,7 +7,7 @@ import React, {
   useState,
 } from "react";
 import { Session, User } from "@supabase/supabase-js";
-import { createAppUrl, getCurrentAppPathAndSearch } from "../lib/appUrl";
+import { createCanonicalRedirectUrl } from "../lib/appUrl";
 import { isSupabaseConfigured, supabase, supabaseConfigError } from "../lib/supabase";
 
 const ROCKETIUM_EMAIL_SUFFIX = "@rocketium.com";
@@ -37,7 +37,7 @@ export const useAuth = () => {
 };
 
 const getCurrentRedirectUrl = () => {
-  return createAppUrl(getCurrentAppPathAndSearch());
+  return createCanonicalRedirectUrl();
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -123,10 +123,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return { error };
     }
 
+    const canonicalRedirectTo = createCanonicalRedirectUrl(redirectTo);
+
+    if ((import.meta as any).env?.DEV) {
+      console.debug("[auth] Supabase OAuth redirect:", canonicalRedirectTo);
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: redirectTo || getCurrentRedirectUrl(),
+        redirectTo: canonicalRedirectTo || getCurrentRedirectUrl(),
         queryParams: {
           hd: "rocketium.com",
           prompt: "select_account",

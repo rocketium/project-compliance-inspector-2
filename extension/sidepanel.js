@@ -11,6 +11,12 @@ const saveBaseUrlButton = document.getElementById("save-base-url");
 const refreshTabButton = document.getElementById("refresh-tab");
 const settingsToggleButton = document.getElementById("settings-toggle");
 const settingsPanel = document.getElementById("settings-panel");
+const panelState = document.getElementById("panel-state");
+const panelStateTitle = document.getElementById("panel-state-title");
+const panelStateText = document.getElementById("panel-state-text");
+const openMainAppButton = document.getElementById("open-main-app");
+const frameShell = document.querySelector(".frame-shell");
+const frameLoading = document.getElementById("frame-loading");
 const appFrame = document.getElementById("app-frame");
 const identityRequestMessageType = "rocketium-review:request-identity";
 const identityResponseMessageType = "rocketium-review:identity";
@@ -23,10 +29,46 @@ const setSettingsOpen = (isOpen) => {
   settingsPanel.hidden = !isOpen;
 };
 
-const setIdentityStatus = (isDetected) => {
+const setIdentityStatus = ({ text, tone = "missing" }) => {
   if (!identityStatus) return;
-  identityStatus.textContent = isDetected ? "Detected from tab" : "Not detected yet";
-  identityStatus.classList.toggle("detected", isDetected);
+  identityStatus.textContent = text;
+  identityStatus.classList.toggle("detected", tone === "detected");
+  identityStatus.classList.toggle("missing", tone === "missing");
+};
+
+const setFrameLoading = (isLoading) => {
+  if (frameLoading) {
+    frameLoading.hidden = !isLoading;
+  }
+};
+
+const showPanelState = (title, text) => {
+  if (panelStateTitle) {
+    panelStateTitle.textContent = title;
+  }
+  if (panelStateText) {
+    panelStateText.textContent = text;
+  }
+  if (panelState) {
+    panelState.hidden = false;
+  }
+  if (frameShell) {
+    frameShell.hidden = true;
+  }
+};
+
+const hidePanelState = () => {
+  if (panelState) {
+    panelState.hidden = true;
+  }
+  if (frameShell) {
+    frameShell.hidden = false;
+  }
+};
+
+const openMainApp = () => {
+  const baseUrl = normalizeBaseUrl(appBaseUrlInput.value || DEFAULT_APP_BASE_URL);
+  window.open(baseUrl || DEFAULT_APP_BASE_URL, "_blank", "noopener,noreferrer");
 };
 
 const getStoredBaseUrl = async () => {
@@ -149,14 +191,37 @@ const renderFrame = async () => {
 
   if (!tabUrl) {
     appFrame.removeAttribute("src");
+    setFrameLoading(false);
+    setIdentityStatus({
+      text: "No active tab",
+      tone: "missing",
+    });
+    showPanelState(
+      "Open a Rocketium tab",
+      "Open a Rocketium project or asset preview tab, then refresh this side panel."
+    );
     return;
   }
 
+  hidePanelState();
+  setFrameLoading(true);
+
   const overrides = await getStoredIdentityOverrides();
   const tabIdentity = await getRocketiumIdentity(tab);
-  setIdentityStatus(
-    Boolean(tabIdentity.rocketiumUserId && tabIdentity.rocketiumSessionId)
+  const hasOverrides = Boolean(
+    overrides.rocketiumUserId && overrides.rocketiumSessionId
   );
+  const hasTabIdentity = Boolean(
+    tabIdentity.rocketiumUserId && tabIdentity.rocketiumSessionId
+  );
+  setIdentityStatus({
+    text: hasOverrides
+      ? "Manual override active"
+      : hasTabIdentity
+      ? "Detected from active tab"
+      : "Rocketium session not detected",
+    tone: hasOverrides || hasTabIdentity ? "detected" : "missing",
+  });
   const rocketiumUserId =
     overrides.rocketiumUserId || tabIdentity.rocketiumUserId;
   const rocketiumSessionId =
@@ -185,7 +250,10 @@ const bootstrap = async () => {
   appBaseUrlInput.value = baseUrl;
   rocketiumUserIdInput.value = identityOverrides.rocketiumUserId;
   rocketiumSessionIdInput.value = identityOverrides.rocketiumSessionId;
-  setIdentityStatus(false);
+  setIdentityStatus({
+    text: "Checking active tab",
+    tone: "missing",
+  });
   setSettingsOpen(false);
   await renderFrame();
 };
@@ -207,6 +275,12 @@ saveBaseUrlButton.addEventListener("click", async () => {
 
 refreshTabButton.addEventListener("click", async () => {
   await renderFrame();
+});
+
+openMainAppButton.addEventListener("click", openMainApp);
+
+appFrame.addEventListener("load", () => {
+  setFrameLoading(false);
 });
 
 bootstrap();

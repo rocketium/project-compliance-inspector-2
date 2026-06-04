@@ -1099,7 +1099,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 setError(null);
                 setSuccess(null);
               }}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 text-white px-4 py-2.5 text-sm font-medium"
+              className="rr-button-primary rr-focus-ring w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium"
             >
               <Plus size={16} />
               Add New {activeDomain === "platforms" ? "Platform" : "Brand"}
@@ -2624,7 +2624,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <button
                 onClick={handleCreateBrandRuleFromPrompt}
                 disabled={isGeneratingPromptDrafts}
-                className="inline-flex items-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 text-white px-4 py-2 text-sm font-medium"
+                className="rr-button-primary rr-focus-ring inline-flex items-center gap-2 px-4 py-2 text-sm font-medium"
               >
                 {isGeneratingPromptDrafts ? (
                   <>
@@ -2692,7 +2692,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </button>
               <button
                 onClick={addCheckType}
-                className="inline-flex items-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 px-4 py-2 text-sm font-medium text-white"
+                className="rr-button-primary rr-focus-ring inline-flex items-center gap-2 px-4 py-2 text-sm font-medium"
               >
                 <Plus size={14} />
                 Add Check Type

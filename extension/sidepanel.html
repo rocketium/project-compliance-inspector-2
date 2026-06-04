@@ -10,8 +10,11 @@
     <div class="shell">
       <header class="topbar">
         <div class="brand">
-          <img src="eye-ai-review.svg" alt="Rocketium Review" class="brand-logo" />
-          <h1>Rocketium Review</h1>
+          <img src="rocketium-review-logo.png" alt="Rocketium Review" class="brand-logo" />
+          <div class="brand-copy">
+            <p>Rocketium</p>
+            <h1>Review</h1>
+          </div>
         </div>
         <div class="topbar-actions">
           <button id="settings-toggle" class="ghost icon-button" title="Settings" aria-label="Settings">
@@ -69,11 +72,29 @@
         <p id="identity-status" class="hint status-pill">Not detected yet</p>
       </section>
 
-      <iframe
-        id="app-frame"
-        title="Rocketium Review App"
-        referrerpolicy="no-referrer"
-      ></iframe>
+      <main class="panel-main">
+        <section id="panel-state" class="panel-state" hidden>
+          <img src="rocketium-review-logo.png" alt="" class="state-logo" />
+          <p class="state-eyebrow">Extension Ready</p>
+          <h2 id="panel-state-title">Open Rocketium Review</h2>
+          <p id="panel-state-text">
+            Open a Rocketium project or asset preview tab, then refresh the side panel.
+          </p>
+          <button id="open-main-app" class="primary">Open Compliance App</button>
+        </section>
+
+        <div class="frame-shell">
+          <div id="frame-loading" class="frame-loading" hidden>
+            <div class="loading-mark"></div>
+            <span>Loading review workspace</span>
+          </div>
+          <iframe
+            id="app-frame"
+            title="Rocketium Review App"
+            referrerpolicy="no-referrer"
+          ></iframe>
+        </div>
+      </main>
     </div>
 
     <script src="sidepanel.js"></script>

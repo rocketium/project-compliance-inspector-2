@@ -1,7 +1,20 @@
 import React, { useMemo, useState } from "react";
-import { AlertCircle, ExternalLink, LogIn, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  ExternalLink,
+  LogIn,
+  ShieldCheck,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { createAppUrl, getCurrentAppPathAndSearch } from "../lib/appUrl";
+
+const trustSignals = [
+  "Rocketium Google account required",
+  "Project reviews stay with your account",
+  "Brand rules ready after sign-in",
+];
 
 export const Login: React.FC = () => {
   const { authError, clearAuthError, signInWithGoogle } = useAuth();
@@ -37,73 +50,102 @@ export const Login: React.FC = () => {
   const visibleError = localError || authError;
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50 dark:bg-zinc-950 flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-[460px]">
-        <div className="mb-8">
-          <div className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 py-3 shadow-sm">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-950 dark:bg-zinc-100">
-              <Sparkles className="h-5 w-5 text-white dark:text-zinc-950" />
+    <div className="min-h-[100dvh] bg-[#f8f8f6] text-zinc-950 dark:bg-[#111113] dark:text-zinc-100">
+      <main className="mx-auto grid min-h-[100dvh] w-full max-w-7xl grid-cols-1 gap-8 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.72fr)] lg:px-8 lg:py-8">
+        <section className="flex min-h-[420px] flex-col justify-between rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_24px_80px_rgba(24,24,27,0.08)] dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-black/30 sm:p-8 lg:min-h-[calc(100dvh-4rem)]">
+          <div className="flex items-center gap-3">
+            <span className="rr-logo-tile flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl">
+              <img
+                src="/rocketium-review-logo.png"
+                alt="Rocketium Review"
+                className="h-full w-full object-cover"
+              />
             </span>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-zinc-500">
-                Protected Workspace
-              </p>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-950 dark:text-zinc-100">
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
                 Rocketium Review
               </h1>
             </div>
           </div>
-        </div>
 
-        <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-sm">
-          <div className="mb-6">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-zinc-900 dark:text-zinc-200">
-              <ShieldCheck className="h-6 w-6" />
+          <div className="mt-14 max-w-3xl lg:mt-0">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#e9c575]/50 bg-[#fbf4e6] px-3 py-1 text-xs font-medium text-[#946713] dark:border-[#6f4c0e]/80 dark:bg-[#2a2215] dark:text-[#e9c575]">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Rocketium access only
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-zinc-100">
-              Sign in with Google
+            <h2 className="max-w-2xl text-[clamp(2.6rem,6vw,5.6rem)] font-semibold leading-[0.95] tracking-tight text-zinc-950 dark:text-zinc-50">
+              Review creative compliance with calmer control.
             </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-zinc-400">
-              Access is limited to verified Rocketium Google accounts.
+            <p className="mt-6 max-w-xl text-base leading-7 text-zinc-600 dark:text-zinc-400">
+              Sign in to inspect projects, validate brand rules, and keep every
+              compliance check tied to a verified Rocketium account.
             </p>
           </div>
 
-          {visibleError && (
-            <div className="mb-5 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
-              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-              <span>{visibleError}</span>
-            </div>
-          )}
+          <div className="mt-12 grid gap-3 sm:grid-cols-3 lg:mt-0">
+            {trustSignals.map((signal) => (
+              <div
+                key={signal}
+                className="flex items-start gap-2 border-t border-zinc-200 pt-3 text-sm leading-5 text-zinc-600 dark:border-zinc-800 dark:text-zinc-400"
+              >
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#b98219]" />
+                <span>{signal}</span>
+              </div>
+            ))}
+          </div>
+        </section>
 
-          {isEmbedded && (
-            <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-              Google sign-in opens in the main app tab. After signing in, refresh the side panel.
+        <aside className="flex items-center lg:min-h-[calc(100dvh-4rem)]">
+          <div className="rr-panel w-full rounded-2xl p-5 dark:bg-zinc-950 sm:p-6">
+            <div className="mb-6">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950">
+                <LogIn className="h-5 w-5" />
+              </div>
+              <h3 className="text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                Continue with Google
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+                Use your @rocketium.com account. Other domains are signed out
+                automatically.
+              </p>
             </div>
-          )}
 
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={isSigningIn}
-            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white dark:disabled:bg-zinc-700 dark:disabled:text-zinc-400"
-          >
-            {isEmbedded ? (
-              <ExternalLink className="h-4 w-4" />
-            ) : (
-              <LogIn className="h-4 w-4" />
+            {visibleError && (
+              <div className="mb-5 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <span>{visibleError}</span>
+              </div>
             )}
-            {isSigningIn
-              ? "Opening Google..."
-              : isEmbedded
-              ? "Open Sign-In Tab"
-              : "Continue With Google"}
-          </button>
 
-          <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-zinc-500">
-            Non-Rocketium accounts are automatically signed out.
-          </p>
-        </div>
-      </div>
+            {isEmbedded && (
+              <div className="mb-5 rounded-xl border border-[#e9c575]/60 bg-[#fbf4e6] px-4 py-3 text-sm leading-6 text-[#6f4c0e] dark:border-[#6f4c0e]/70 dark:bg-[#2a2215] dark:text-[#e9c575]">
+                Google sign-in opens in the main app tab. After signing in,
+                refresh the side panel.
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isSigningIn}
+              aria-busy={isSigningIn}
+              className="rr-button-primary rr-focus-ring flex w-full items-center justify-center gap-2 px-4 py-3 text-sm font-semibold"
+            >
+              {isEmbedded ? (
+                <ExternalLink className="h-4 w-4" />
+              ) : (
+                <LogIn className="h-4 w-4" />
+              )}
+              {isSigningIn
+                ? "Opening Google..."
+                : isEmbedded
+                ? "Open Sign-In Tab"
+                : "Sign in with Google"}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </aside>
+      </main>
     </div>
   );
 };

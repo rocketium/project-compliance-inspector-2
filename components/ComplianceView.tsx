@@ -321,10 +321,10 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
           <button
             onClick={runComplianceCheck}
             disabled={isLoading}
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-md shadow-indigo-200 dark:shadow-indigo-900/30 transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+            className="rr-button-primary rr-focus-ring px-6 py-3 font-medium shadow-md shadow-zinc-200/70 dark:shadow-black/20 transition-all flex items-center gap-2"
           >
             {isLoading ? (
-              <Spinner className="w-5 h-5 text-white" />
+              <Spinner className="w-5 h-5" />
             ) : (
               <Play size={20} />
             )}
@@ -594,7 +594,7 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
                                   handleAutoFix(originalIndex);
                                 }}
                                 disabled={fixingRuleIndex === originalIndex}
-                                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-xs font-medium rounded-lg transition-colors disabled:cursor-not-allowed"
+                                className="rr-button-primary rr-focus-ring w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium"
                               >
                                 {fixingRuleIndex === originalIndex ? (
                                   <>

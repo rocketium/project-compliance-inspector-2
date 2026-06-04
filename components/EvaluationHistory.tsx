@@ -200,7 +200,7 @@ export const EvaluationHistory: React.FC = () => {
               </p>
               <button
                 onClick={() => navigate("/")}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
+                className="rr-button-primary rr-focus-ring px-6 py-3 font-medium"
               >
                 Evaluate a Project
               </button>

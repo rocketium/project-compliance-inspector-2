@@ -71,7 +71,7 @@ const getCheckTypeHeaderTextClasses = (checkType?: string) => {
     normalized.includes("brand") ||
     normalized.includes("variant")
   ) {
-    return "text-violet-300";
+    return "text-[#e9c575]";
   }
 
   if (
@@ -553,7 +553,7 @@ export const ExtensionPanel: React.FC = () => {
         >
           <polygon
             points={points}
-            className="fill-violet-500/20 stroke-violet-300"
+            className="fill-[#dba642]/20 stroke-[#e9c575]"
             strokeWidth={2}
             strokeLinejoin="round"
           />
@@ -564,7 +564,7 @@ export const ExtensionPanel: React.FC = () => {
     return (
       <div
         key={element.id}
-        className="absolute rounded-lg border-2 border-violet-300 bg-violet-500/15 shadow-[0_0_0_1px_rgba(139,92,246,0.25)]"
+        className="absolute rounded-lg border-2 border-[#e9c575] bg-[#dba642]/15 shadow-[0_0_0_1px_rgba(219,166,66,0.25)]"
         style={{
           left: offsetX + element.box.xmin * displayWidth,
           top: offsetY + element.box.ymin * displayHeight,
@@ -604,7 +604,7 @@ export const ExtensionPanel: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="dark min-h-screen bg-zinc-950 text-zinc-100">
       <div className="max-w-7xl mx-auto px-4 py-4">
         <section className="rounded-[28px] border border-zinc-800 bg-zinc-950/95 p-4 shadow-2xl shadow-black/20 mb-4">
           <div className="space-y-3">
@@ -698,7 +698,7 @@ export const ExtensionPanel: React.FC = () => {
                                 onClick={() => setPanelFilter(value as PanelFilter)}
                                 className={`rounded-xl px-3 py-2 text-left text-sm ${
                                   panelFilter === value
-                                    ? "bg-violet-500/15 text-violet-200"
+                                    ? "bg-[#dba642]/15 text-[#f4dfb9]"
                                     : "bg-zinc-950 text-zinc-300 hover:bg-zinc-800"
                                 }`}
                               >
@@ -721,7 +721,7 @@ export const ExtensionPanel: React.FC = () => {
                                 onClick={() => setEngineFilter(value as EngineFilter)}
                                 className={`rounded-xl px-3 py-2 text-left text-sm ${
                                   engineFilter === value
-                                    ? "bg-violet-500/15 text-violet-200"
+                                    ? "bg-[#dba642]/15 text-[#f4dfb9]"
                                     : "bg-zinc-950 text-zinc-300 hover:bg-zinc-800"
                                 }`}
                               >
@@ -750,7 +750,7 @@ export const ExtensionPanel: React.FC = () => {
                 <button
                   onClick={handleAnalyze}
                   disabled={!parsedSource || isLoadingConfig || isCreatingJob || !activeBrand}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-100 hover:bg-white disabled:bg-zinc-800 disabled:text-zinc-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition-colors"
+                  className="rr-button-primary rr-focus-ring w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold"
                 >
                   {isCreatingJob ? (
                     <>
@@ -861,10 +861,10 @@ export const ExtensionPanel: React.FC = () => {
             {isAssetsCollapsed ? (
               <div className="py-1" />
             ) : job ? (
-              <div className="space-y-3 max-h-[720px] overflow-y-auto pr-1">
+              <div className="space-y-4 max-h-[720px] overflow-y-auto pr-1">
                 {groupedCreatives.length > 0 ? (
                   groupedCreatives.map((group) => (
-                    <div key={group.variantName} className="space-y-2">
+                    <div key={group.variantName} className="space-y-3">
                       <div className="sticky top-0 z-10 rounded-xl border border-zinc-800 bg-zinc-900/95 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
                         {group.variantName}
                       </div>
@@ -881,7 +881,7 @@ export const ExtensionPanel: React.FC = () => {
                               isSelected
                                 ? hasFailures
                                   ? "border-rose-500/60 bg-rose-500/10"
-                                  : "border-zinc-600 bg-zinc-900"
+                                  : "border-[#dba642]/70 bg-zinc-900"
                                 : hasFailures
                                 ? "border-rose-500/40 bg-zinc-950 hover:border-rose-400/70"
                                 : "border-zinc-800 bg-zinc-950 hover:border-zinc-700"
@@ -961,7 +961,7 @@ export const ExtensionPanel: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-lg font-semibold text-white">
@@ -1089,17 +1089,17 @@ export const ExtensionPanel: React.FC = () => {
                     </div>
 
                     {groupedResults.length > 0 || showQueuedRules ? (
-                      <>
+                      <div className="space-y-4">
                         {groupedResults.map((engineGroup) => (
                         <section
                           key={engineGroup.engine}
-                          className="rounded-2xl bg-zinc-900/60 border border-zinc-800 p-4 space-y-3"
+                          className="rounded-2xl bg-zinc-900/60 border border-zinc-800 p-4 space-y-4"
                         >
                           <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                             {engineGroup.label}
                           </div>
                           {engineGroup.groups.map((group) => (
-                            <div key={`${engineGroup.engine}-${group.checkType}`} className="space-y-3">
+                            <div key={`${engineGroup.engine}-${group.checkType}`} className="space-y-4">
                               <div className="px-1 py-0.5">
                                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
                                   Rule Category
@@ -1119,12 +1119,12 @@ export const ExtensionPanel: React.FC = () => {
                                     onClick={() => toggleResultHighlight(result)}
                                     className={`w-full text-left rounded-xl border px-3 py-3 ${
                                       highlightedRuleKey === getResultKey(result)
-                                        ? "border-violet-400/60 bg-violet-500/10"
+                                        ? "border-[#dba642]/70 bg-[#dba642]/10"
                                         : "border-zinc-800 bg-zinc-950"
                                     } ${
                                       (result.engine || "visual") === "visual" &&
                                       result.relatedElementIds?.length
-                                        ? "cursor-pointer hover:border-violet-500/40"
+                                        ? "cursor-pointer hover:border-[#dba642]/50"
                                         : "cursor-default"
                                     }`}
                                   >
@@ -1198,7 +1198,7 @@ export const ExtensionPanel: React.FC = () => {
                         ))}
 
                         {showQueuedRules && (
-                          <section className="rounded-2xl bg-zinc-900/40 border border-zinc-800 p-4 space-y-3">
+                          <section className="rounded-2xl bg-zinc-900/40 border border-zinc-800 p-4 space-y-4">
                             <div className="flex items-center justify-between gap-3">
                               <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                                 Queued For Evaluation
@@ -1232,14 +1232,14 @@ export const ExtensionPanel: React.FC = () => {
                             </div>
 
                             {queuedRuleGroups.map((engineGroup) => (
-                              <section key={`queued-${engineGroup.engine}`} className="space-y-3">
+                              <section key={`queued-${engineGroup.engine}`} className="space-y-4">
                                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                                   {engineGroup.label}
                                 </div>
                                 {engineGroup.groups.map((group) => (
                                   <div
                                     key={`queued-${engineGroup.engine}-${group.checkType}`}
-                                    className="space-y-3"
+                                    className="space-y-4"
                                   >
                                     <div className="px-1 py-0.5">
                                       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
@@ -1296,7 +1296,7 @@ export const ExtensionPanel: React.FC = () => {
                             ))}
                           </section>
                         )}
-                      </>
+                      </div>
                     ) : (
                       <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950 px-4 py-10 text-center text-sm text-zinc-500">
                         No compliance results match the current filters.

@@ -185,7 +185,7 @@ const getCheckTypeHeaderTextClasses = (checkType?: string) => {
     normalized.includes("brand") ||
     normalized.includes("variant")
   ) {
-    return "text-violet-700 dark:text-violet-300";
+    return "text-[#946713] dark:text-[#e9c575]";
   }
 
   if (
@@ -802,7 +802,7 @@ export const EvaluateProject: React.FC = () => {
         >
           <polygon
             points={points}
-            className="fill-violet-500/20 stroke-violet-300"
+            className="fill-[#dba642]/20 stroke-[#e9c575]"
             strokeWidth={0.8}
             strokeLinejoin="round"
           />
@@ -813,7 +813,7 @@ export const EvaluateProject: React.FC = () => {
     return (
       <div
         key={element.id}
-        className="absolute rounded-lg border-2 border-violet-300 bg-violet-500/15 shadow-[0_0_0_1px_rgba(139,92,246,0.25)]"
+        className="absolute rounded-lg border-2 border-[#e9c575] bg-[#dba642]/15 shadow-[0_0_0_1px_rgba(219,166,66,0.25)]"
         style={{
           left: `${element.box.xmin * 100}%`,
           top: `${element.box.ymin * 100}%`,
@@ -835,7 +835,7 @@ export const EvaluateProject: React.FC = () => {
         );
       case "major":
         return (
-          <span className="text-[9px] font-semibold px-1.5 py-px rounded-full bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-600 dark:text-orange-400 border border-orange-200/50 dark:border-orange-700/50">
+          <span className="text-[9px] font-semibold px-1.5 py-px rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-700/50">
             Major
           </span>
         );
@@ -853,7 +853,7 @@ export const EvaluateProject: React.FC = () => {
   const getCategoryBadge = (category?: string) => {
     const styles: Record<string, string> = {
       brand:
-        "from-violet-500/20 to-purple-500/20 text-violet-600 dark:text-violet-400 border-violet-200/50 dark:border-violet-700/50",
+        "from-[#f8ecd2] to-[#f2dfb7] text-[#8a5d0f] border-[#e7c978]/70 dark:from-[#dba642]/15 dark:to-[#f3d58c]/10 dark:text-[#e9c575] dark:border-[#dba642]/35",
       accessibility:
         "from-blue-500/20 to-cyan-500/20 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-700/50",
       policy:
@@ -970,8 +970,8 @@ export const EvaluateProject: React.FC = () => {
               <ArrowLeft size={16} />
             </button>
             <div className="flex items-center gap-2 min-w-0">
-              <div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-1.5 rounded-lg shadow-md shadow-indigo-500/20">
-                <Layers className="text-white h-4 w-4" />
+              <div className="border border-[#6f4c0e]/70 bg-[#2a2215] p-1.5 rounded-lg shadow-sm">
+                <Layers className="text-[#e9c575] h-4 w-4" />
               </div>
               <div className="min-w-0 flex items-center">
                 <h1 className="text-sm font-semibold text-slate-900 dark:text-white tracking-tight leading-tight truncate">
@@ -1019,14 +1019,14 @@ export const EvaluateProject: React.FC = () => {
                   ) ? (
                     <div className="flex items-center gap-1.5">
                       <div className="relative">
-                        <div className="w-4 h-4 rounded-full border-2 border-indigo-200 dark:border-indigo-800" />
-                        <div className="absolute inset-0 w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+                        <div className="w-4 h-4 rounded-full border-2 border-[#e9c575]/30 dark:border-[#6f4c0e]" />
+                        <div className="absolute inset-0 w-4 h-4 rounded-full border-2 border-[#dba642] border-t-transparent animate-spin" />
                       </div>
                       <div className="flex items-baseline gap-1.5">
-                        <div className="text-[9px] uppercase tracking-wider text-indigo-500 font-medium leading-tight">
+                        <div className="text-[9px] uppercase tracking-wider text-[#946713] dark:text-[#e9c575] font-medium leading-tight">
                           Analyzing
                         </div>
-                        <div className="text-sm font-bold text-indigo-600 dark:text-indigo-400 tabular-nums leading-tight">
+                        <div className="text-sm font-bold text-[#946713] dark:text-[#e9c575] tabular-nums leading-tight">
                           {creatives.filter((c) => c.complianceScores).length}/
                           {creatives.length}
                         </div>
@@ -1080,7 +1080,7 @@ export const EvaluateProject: React.FC = () => {
                           }}
                           className={`w-full text-left px-3 py-1.5 text-xs rounded-lg transition-all duration-200 ${
                             activePlatformId === p.id
-                              ? "bg-gradient-to-r from-indigo-500/10 to-violet-500/10 text-indigo-700 dark:text-indigo-300 font-medium"
+                              ? "bg-[#fbf4e6] text-[#8a5d0f] dark:bg-[#2a2215] dark:text-[#e9c575] font-medium"
                               : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
                           }`}
                         >
@@ -1108,7 +1108,7 @@ export const EvaluateProject: React.FC = () => {
                 disabled={creatives.some(
                   (c) => c.isAnalyzing || c.isCheckingCompliance
                 )}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 disabled:from-indigo-400 disabled:to-violet-400 text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-md shadow-indigo-500/25 hover:shadow-indigo-500/40 disabled:shadow-none"
+                className="rr-button-primary rr-focus-ring flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium"
               >
                 {creatives.some(
                   (c) => c.isAnalyzing || c.isCheckingCompliance
@@ -1122,7 +1122,7 @@ export const EvaluateProject: React.FC = () => {
               <button
                 onClick={analyzeAllAttention}
                 disabled={creatives.some((c) => c.isAnalyzingAttention)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 disabled:from-orange-400 disabled:to-rose-400 text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-md shadow-orange-500/25 hover:shadow-orange-500/40 disabled:shadow-none"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-zinc-800 text-xs font-medium transition-all duration-200 shadow-sm hover:border-[#dba642] hover:bg-[#fbf4e6] disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400 disabled:shadow-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-[#dba642] dark:hover:bg-[#2a2215] dark:disabled:border-zinc-800 dark:disabled:bg-zinc-900/70 dark:disabled:text-zinc-600"
               >
                 {creatives.some((c) => c.isAnalyzingAttention) ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -1154,7 +1154,7 @@ export const EvaluateProject: React.FC = () => {
             <div className="text-center">
               <div className="relative w-12 h-12 mx-auto mb-4">
                 <div className="absolute inset-0 rounded-full border-3 border-slate-200 dark:border-slate-700" />
-                <div className="absolute inset-0 rounded-full border-3 border-transparent border-t-indigo-500 animate-spin" />
+                <div className="absolute inset-0 rounded-full border-3 border-transparent border-t-[#dba642] animate-spin" />
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                 Loading project...
@@ -1175,7 +1175,7 @@ export const EvaluateProject: React.FC = () => {
               </p>
               <button
                 onClick={() => navigate("/")}
-                className="px-4 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-medium hover:bg-slate-800 dark:hover:bg-slate-100 transition-all duration-200"
+                className="rr-button-primary rr-focus-ring px-4 py-1.5 text-xs font-medium"
               >
                 Go Back
               </button>
@@ -1199,14 +1199,14 @@ export const EvaluateProject: React.FC = () => {
                   </span>
                 </h2>
               </div>
-              <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+              <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
                 {creatives.map((creative) => (
                   <button
                     key={creative.id}
                     onClick={() => setSelectedCreativeId(creative.id)}
                     className={`w-full text-left p-2 rounded-xl border transition-all duration-200 group ${
                       selectedCreativeId === creative.id
-                        ? "border-indigo-300 dark:border-indigo-600 bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-900/30 dark:to-violet-900/30 shadow-md shadow-indigo-100 dark:shadow-indigo-900/20"
+                        ? "border-[#b98219] dark:border-[#dba642] bg-[#fbf4e6]/70 dark:bg-zinc-800/70 shadow-sm shadow-zinc-200/60 dark:shadow-black/20"
                         : "border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/50 bg-white/80 dark:bg-slate-800/30"
                     }`}
                   >
@@ -1240,7 +1240,7 @@ export const EvaluateProject: React.FC = () => {
                         {/* Status indicators */}
                         <div className="mt-1 flex items-center gap-1 flex-wrap">
                           {creative.isAnalyzing && (
-                            <span className="flex items-center gap-0.5 text-[9px] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-px rounded-full font-medium">
+                            <span className="flex items-center gap-0.5 text-[9px] text-[#946713] dark:text-[#e9c575] bg-[#fbf4e6] dark:bg-[#2a2215] px-1.5 py-px rounded-full font-medium">
                               <Loader2 size={8} className="animate-spin" />
                               Analyzing
                             </span>
@@ -1252,7 +1252,7 @@ export const EvaluateProject: React.FC = () => {
                             </span>
                           )}
                           {creative.isAnalyzingAttention && (
-                            <span className="flex items-center gap-0.5 text-[9px] text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 px-1.5 py-px rounded-full font-medium">
+                            <span className="flex items-center gap-0.5 text-[9px] text-[#946713] dark:text-[#e9c575] bg-[#fbf4e6] dark:bg-[#2a2215] px-1.5 py-px rounded-full font-medium">
                               <Loader2 size={8} className="animate-spin" />
                               Attention
                             </span>
@@ -1271,7 +1271,7 @@ export const EvaluateProject: React.FC = () => {
                             </span>
                           )}
                           {creative.attentionResult && (
-                            <span className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-px rounded-full bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
+                            <span className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-px rounded-full bg-[#fbf4e6] dark:bg-[#2a2215] text-[#946713] dark:text-[#e9c575]">
                               <Focus size={8} />
                               {creative.attentionResult.clarityScore}%
                             </span>
@@ -1316,7 +1316,7 @@ export const EvaluateProject: React.FC = () => {
                           }}
                           className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-lg font-medium transition-all duration-200 ${
                             showHeatmap
-                              ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-md shadow-orange-500/25"
+                              ? "bg-[#946713] text-white shadow-md shadow-[#dba642]/20 dark:bg-[#dba642] dark:text-zinc-950"
                               : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
                           }`}
                         >
@@ -1328,7 +1328,7 @@ export const EvaluateProject: React.FC = () => {
                         href={selectedCreative.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 transition-colors"
+                        className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-[#946713] dark:hover:text-[#e9c575] flex items-center gap-1 transition-colors"
                       >
                         <ExternalLink size={12} />
                         Open
@@ -1339,7 +1339,7 @@ export const EvaluateProject: React.FC = () => {
                           selectedCreative.isAnalyzing ||
                           selectedCreative.isCheckingCompliance
                         }
-                        className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 disabled:bg-slate-400 text-white dark:text-slate-900 text-[11px] rounded-lg font-medium transition-all duration-200"
+                        className="rr-button-primary rr-focus-ring flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium"
                       >
                         {selectedCreative.isAnalyzing ||
                         selectedCreative.isCheckingCompliance ? (
@@ -1552,7 +1552,7 @@ export const EvaluateProject: React.FC = () => {
                       onClick={() => setRightPanelTab("compliance")}
                       className={`flex-1 py-2.5 text-[11px] font-medium flex items-center justify-center gap-1.5 transition-all duration-200 border-b-2 ${
                         rightPanelTab === "compliance"
-                          ? "border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-white/50 dark:bg-slate-800/50"
+                          ? "border-[#b98219] text-[#946713] dark:text-[#e9c575] bg-white/50 dark:bg-slate-800/50"
                           : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                       }`}
                     >
@@ -1563,7 +1563,7 @@ export const EvaluateProject: React.FC = () => {
                       onClick={() => setRightPanelTab("attention")}
                       className={`flex-1 py-2.5 text-[11px] font-medium flex items-center justify-center gap-1.5 transition-all duration-200 border-b-2 ${
                         rightPanelTab === "attention"
-                          ? "border-orange-500 text-orange-600 dark:text-orange-400 bg-white/50 dark:bg-slate-800/50"
+                          ? "border-[#b98219] text-[#946713] dark:text-[#e9c575] bg-white/50 dark:bg-slate-800/50"
                           : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                       }`}
                     >
@@ -1574,7 +1574,7 @@ export const EvaluateProject: React.FC = () => {
                       )}
                       Attention
                       {isFirstCreative && selectedCreative.attentionResult && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 font-bold">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#fbf4e6] dark:bg-[#2a2215] text-[#946713] dark:text-[#e9c575] font-bold">
                           {selectedCreative.attentionResult.clarityScore}%
                         </span>
                       )}
@@ -1605,8 +1605,8 @@ export const EvaluateProject: React.FC = () => {
                             Attention analysis is available for the first
                             creative in this project.
                           </p>
-                          <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-lg px-3 py-2 border border-orange-200/50 dark:border-orange-800/30">
-                            <p className="text-[10px] text-orange-700 dark:text-orange-400 font-medium">
+                          <div className="bg-gradient-to-r from-[#fbf4e6] to-zinc-50 dark:from-[#2a2215] dark:to-zinc-900 rounded-lg px-3 py-2 border border-[#e7c978]/60 dark:border-[#dba642]/35">
+                            <p className="text-[10px] text-[#946713] dark:text-[#e9c575] font-medium">
                               Select the first creative to use this feature
                             </p>
                           </div>
@@ -1614,13 +1614,13 @@ export const EvaluateProject: React.FC = () => {
                       ) : selectedCreative.isAnalyzingAttention ? (
                         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
                           <div className="relative w-14 h-14 mx-auto mb-4">
-                            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-orange-500/20 to-rose-500/20" />
+                            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-[#dba642]/20 to-[#f3d58c]/10" />
                             <div className="absolute inset-1 rounded-full bg-white dark:bg-slate-900" />
-                            <div className="absolute inset-0 rounded-full border-3 border-transparent border-t-orange-500 animate-spin" />
+                            <div className="absolute inset-0 rounded-full border-3 border-transparent border-t-[#dba642] animate-spin" />
                             <div className="absolute inset-0 flex items-center justify-center">
                               <Focus
                                 size={18}
-                                className="text-orange-500 animate-pulse"
+                                className="text-[#b98219] dark:text-[#e9c575] animate-pulse"
                               />
                             </div>
                           </div>
@@ -1640,7 +1640,7 @@ export const EvaluateProject: React.FC = () => {
                                 <h3 className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                                   <Flame
                                     size={14}
-                                    className="text-orange-500"
+                                    className="text-[#b98219] dark:text-[#e9c575]"
                                   />
                                   Attention Analysis
                                 </h3>
@@ -1658,50 +1658,50 @@ export const EvaluateProject: React.FC = () => {
 
                             {/* Clarity & Focus Scores */}
                             <div className="grid grid-cols-2 gap-3 mb-3">
-                              <div className="bg-gradient-to-br from-violet-50 via-indigo-50 to-violet-100 dark:from-violet-900/30 dark:via-indigo-900/20 dark:to-violet-900/30 rounded-xl p-3.5 border border-violet-200/60 dark:border-violet-700/40 shadow-sm shadow-violet-100 dark:shadow-violet-900/20">
+                              <div className="bg-gradient-to-br from-zinc-50 via-[#fbf4e6] to-zinc-100 dark:from-zinc-800/70 dark:via-[#2a2215]/50 dark:to-zinc-900 rounded-xl p-3.5 border border-[#e7c978]/60 dark:border-[#dba642]/35 shadow-sm shadow-zinc-200/70 dark:shadow-black/20">
                                 <div className="flex items-center gap-1.5 mb-2">
-                                  <div className="w-5 h-5 rounded-md bg-violet-500/15 dark:bg-violet-500/25 flex items-center justify-center">
+                                  <div className="w-5 h-5 rounded-md bg-[#dba642]/15 dark:bg-[#dba642]/25 flex items-center justify-center">
                                     <Eye
                                       size={11}
-                                      className="text-violet-600 dark:text-violet-400"
+                                      className="text-[#946713] dark:text-[#e9c575]"
                                     />
                                   </div>
-                                  <div className="text-[11px] text-violet-700 dark:text-violet-300 font-semibold uppercase tracking-wide">
+                                  <div className="text-[11px] text-[#946713] dark:text-[#e9c575] font-semibold uppercase tracking-wide">
                                     Clarity Score
                                   </div>
                                 </div>
                                 <div className="flex items-baseline gap-1.5">
-                                  <span className="text-3xl font-bold text-violet-700 dark:text-violet-300 tabular-nums leading-none">
+                                  <span className="text-3xl font-bold text-[#8a5d0f] dark:text-[#f3d58c] tabular-nums leading-none">
                                     {
                                       selectedCreative.attentionResult
                                         .clarityScore
                                     }
                                   </span>
-                                  <span className="text-sm text-violet-400 dark:text-violet-500 font-medium">
+                                  <span className="text-sm text-[#b98219] dark:text-[#dba642] font-medium">
                                     /100
                                   </span>
                                 </div>
                               </div>
-                              <div className="bg-gradient-to-br from-orange-50 via-rose-50 to-orange-100 dark:from-orange-900/30 dark:via-rose-900/20 dark:to-orange-900/30 rounded-xl p-3.5 border border-orange-200/60 dark:border-orange-700/40 shadow-sm shadow-orange-100 dark:shadow-orange-900/20">
+                              <div className="bg-gradient-to-br from-zinc-50 via-white to-[#fbf4e6] dark:from-zinc-800/70 dark:via-zinc-900 dark:to-[#2a2215]/50 rounded-xl p-3.5 border border-zinc-200/70 dark:border-zinc-700/70 shadow-sm shadow-zinc-200/70 dark:shadow-black/20">
                                 <div className="flex items-center gap-1.5 mb-2">
-                                  <div className="w-5 h-5 rounded-md bg-orange-500/15 dark:bg-orange-500/25 flex items-center justify-center">
+                                  <div className="w-5 h-5 rounded-md bg-[#dba642]/15 dark:bg-[#dba642]/25 flex items-center justify-center">
                                     <Target
                                       size={11}
-                                      className="text-orange-600 dark:text-orange-400"
+                                      className="text-[#946713] dark:text-[#e9c575]"
                                     />
                                   </div>
-                                  <div className="text-[11px] text-orange-700 dark:text-orange-300 font-semibold uppercase tracking-wide">
+                                  <div className="text-[11px] text-zinc-700 dark:text-zinc-300 font-semibold uppercase tracking-wide">
                                     Focus Score
                                   </div>
                                 </div>
                                 <div className="flex items-baseline gap-1.5">
-                                  <span className="text-3xl font-bold text-orange-700 dark:text-orange-300 tabular-nums leading-none">
+                                  <span className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums leading-none">
                                     {
                                       selectedCreative.attentionResult
                                         .focusScore
                                     }
                                   </span>
-                                  <span className="text-sm text-orange-400 dark:text-orange-500 font-medium">
+                                  <span className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">
                                     /100
                                   </span>
                                 </div>
@@ -1854,7 +1854,7 @@ export const EvaluateProject: React.FC = () => {
                                 analyzeAttention(selectedCreative.id)
                               }
                               disabled={selectedCreative.isAnalyzingAttention}
-                              className="w-full py-1.5 text-[11px] text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 font-medium flex items-center justify-center gap-1.5 disabled:opacity-50 bg-orange-50 dark:bg-orange-900/20 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-all duration-200"
+                              className="w-full py-1.5 text-[11px] text-[#946713] dark:text-[#e9c575] hover:text-[#6f4c0e] dark:hover:text-[#f3d58c] font-medium flex items-center justify-center gap-1.5 disabled:cursor-not-allowed disabled:text-zinc-400 dark:disabled:text-zinc-600 bg-[#fbf4e6] dark:bg-[#2a2215] rounded-lg hover:bg-[#f4dfb9] dark:hover:bg-[#342a19] transition-all duration-200"
                             >
                               {selectedCreative.isAnalyzingAttention ? (
                                 <Spinner className="w-3 h-3" />
@@ -1867,10 +1867,10 @@ export const EvaluateProject: React.FC = () => {
                         </div>
                       ) : (
                         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-                          <div className="w-14 h-14 bg-gradient-to-br from-orange-100 to-rose-100 dark:from-orange-900/30 dark:to-rose-900/30 rounded-2xl flex items-center justify-center mb-4">
+                          <div className="w-14 h-14 bg-gradient-to-br from-[#fbf4e6] to-zinc-100 dark:from-[#2a2215] dark:to-zinc-800 rounded-2xl flex items-center justify-center mb-4">
                             <Focus
                               size={24}
-                              className="text-orange-500 dark:text-orange-400"
+                              className="text-[#b98219] dark:text-[#e9c575]"
                             />
                           </div>
                           <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1">
@@ -1885,7 +1885,7 @@ export const EvaluateProject: React.FC = () => {
                             onClick={() =>
                               analyzeAttention(selectedCreative.id)
                             }
-                            className="px-4 py-2 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white rounded-xl text-xs font-medium shadow-md shadow-orange-500/25 hover:shadow-orange-500/40 transition-all duration-200 flex items-center gap-1.5"
+                            className="rr-button-secondary rr-focus-ring px-4 py-2 text-xs font-medium shadow-sm transition-all duration-200 flex items-center gap-1.5"
                           >
                             <Focus size={14} />
                             Analyze Attention
@@ -1897,13 +1897,13 @@ export const EvaluateProject: React.FC = () => {
                       selectedCreative.isCheckingCompliance ? (
                       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
                         <div className="relative w-14 h-14 mx-auto mb-4">
-                          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500/20 to-violet-500/20" />
+                          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-[#dba642]/20 to-[#f3d58c]/10" />
                           <div className="absolute inset-1 rounded-full bg-white dark:bg-slate-900" />
-                          <div className="absolute inset-0 rounded-full border-3 border-transparent border-t-indigo-500 animate-spin" />
+                          <div className="absolute inset-0 rounded-full border-3 border-transparent border-t-[#dba642] animate-spin" />
                           <div className="absolute inset-0 flex items-center justify-center">
                             <Sparkles
                               size={18}
-                              className="text-indigo-500 animate-pulse"
+                              className="text-[#b98219] dark:text-[#e9c575] animate-pulse"
                             />
                           </div>
                         </div>
@@ -1930,7 +1930,7 @@ export const EvaluateProject: React.FC = () => {
                                 <h3 className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                                   <ShieldCheck
                                     size={14}
-                                    className="text-indigo-500"
+                                    className="text-[#b98219] dark:text-[#e9c575]"
                                   />
                                   Compliance Score
                                 </h3>
@@ -1989,7 +1989,7 @@ export const EvaluateProject: React.FC = () => {
                             onClick={() => setActiveTab("dashboard")}
                             className={`flex-1 py-1.5 text-[11px] font-medium flex items-center justify-center gap-1 rounded-md transition-all duration-200 ${
                               activeTab === "dashboard"
-                                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                                ? "bg-white dark:bg-slate-700 text-[#946713] dark:text-[#e9c575] shadow-sm"
                                 : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                             }`}
                           >
@@ -1999,7 +1999,7 @@ export const EvaluateProject: React.FC = () => {
                             onClick={() => setActiveTab("details")}
                             className={`flex-1 py-1.5 text-[11px] font-medium flex items-center justify-center gap-1 rounded-md transition-all duration-200 ${
                               activeTab === "details"
-                                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                                ? "bg-white dark:bg-slate-700 text-[#946713] dark:text-[#e9c575] shadow-sm"
                                 : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                             }`}
                           >
@@ -2152,7 +2152,7 @@ export const EvaluateProject: React.FC = () => {
                                 }
                               )}
                             </div>
-                            <div className="overflow-y-auto p-2.5 space-y-2 flex-1 min-h-0">
+                            <div className="overflow-y-auto p-3 space-y-3 flex-1 min-h-0">
                               {groupedFilteredResults.length === 0 && (
                                 <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 px-3 py-6 text-center text-[11px] text-slate-500 dark:text-slate-400">
                                   No rules match the current filters.
@@ -2166,7 +2166,7 @@ export const EvaluateProject: React.FC = () => {
                                   {engineGroup.groups.map((group) => (
                                     <div
                                       key={`${engineGroup.engine}-${group.checkType}`}
-                                      className="space-y-2"
+                                      className="space-y-3"
                                     >
                                       <div className="px-1 py-0.5">
                                         <div className="text-[9px] font-medium uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
@@ -2247,7 +2247,7 @@ export const EvaluateProject: React.FC = () => {
                                                     {(res.engine || "visual") ===
                                                       "visual" &&
                                                       res.relatedElementIds?.length && (
-                                                        <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-px rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300 border border-violet-200/60 dark:border-violet-700/50">
+                                                        <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-px rounded-full bg-[#fbf4e6] dark:bg-[#2a2215] text-[#946713] dark:text-[#e9c575] border border-[#e9c575]/60 dark:border-[#6f4c0e]/70">
                                                           <Eye size={10} />
                                                           Click highlights image
                                                         </span>
@@ -2335,7 +2335,7 @@ export const EvaluateProject: React.FC = () => {
                               selectedCreative.isAnalyzing ||
                               selectedCreative.isCheckingCompliance
                             }
-                            className="w-full py-1.5 text-[11px] text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium flex items-center justify-center gap-1.5 disabled:opacity-50 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-all duration-200"
+                            className="w-full py-1.5 text-[11px] text-[#946713] dark:text-[#e9c575] hover:text-[#6f4c0e] dark:hover:text-[#f3d58c] font-medium flex items-center justify-center gap-1.5 disabled:cursor-not-allowed disabled:text-zinc-400 dark:disabled:text-zinc-600 bg-[#fbf4e6] dark:bg-[#2a2215] rounded-lg hover:bg-[#f4dfb9] dark:hover:bg-[#342a19] transition-all duration-200"
                           >
                             {selectedCreative.isAnalyzing ||
                             selectedCreative.isCheckingCompliance ? (
@@ -2349,10 +2349,10 @@ export const EvaluateProject: React.FC = () => {
                       </div>
                     ) : (
                       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-                        <div className="w-14 h-14 bg-gradient-to-br from-indigo-100 to-violet-100 dark:from-indigo-900/30 dark:to-violet-900/30 rounded-2xl flex items-center justify-center mb-4">
+                        <div className="w-14 h-14 bg-gradient-to-br from-[#fbf4e6] to-zinc-100 dark:from-[#2a2215] dark:to-zinc-800 rounded-2xl flex items-center justify-center mb-4">
                           <ShieldCheck
                             size={24}
-                            className="text-indigo-500 dark:text-indigo-400"
+                            className="text-[#b98219] dark:text-[#e9c575]"
                           />
                         </div>
                         <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1">
@@ -2368,7 +2368,7 @@ export const EvaluateProject: React.FC = () => {
                         </p>
                         <button
                           onClick={() => analyzeCreative(selectedCreative.id)}
-                          className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white rounded-xl text-xs font-medium shadow-md shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all duration-200 flex items-center gap-1.5"
+                          className="rr-button-primary rr-focus-ring px-4 py-2 text-xs font-medium shadow-sm transition-all duration-200 flex items-center gap-1.5"
                         >
                           <Sparkles size={14} />
                           Run Analysis

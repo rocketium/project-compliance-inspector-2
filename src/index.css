@@ -1,8 +1,21 @@
 @import "tailwindcss";
 
-/* Override colors for grayscale dark mode */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Rocketium Review design tokens */
 @theme {
-  /* Slate → Neutral grays (removes blue tint) */
+  --font-sans: Geist, Satoshi, "Cabinet Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-rocket-gold-50: #fbf4e6;
+  --color-rocket-gold-100: #f4dfb9;
+  --color-rocket-gold-200: #e9c575;
+  --color-rocket-gold-300: #dba642;
+  --color-rocket-gold-400: #b98219;
+  --color-rocket-gold-500: #946713;
+  --color-rocket-gold-600: #6f4c0e;
+
+  /* Slate -> neutral grays (removes blue tint) */
   --color-slate-50: #fafafa;
   --color-slate-100: #f5f5f5;
   --color-slate-200: #e5e5e5;
@@ -39,29 +52,41 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    color-scheme: light;
+    --background: 60 14% 97%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
+    --primary: 38 76% 41%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
+    --secondary: 0 0% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
+    --muted: 0 0% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
+    --accent: 38 76% 41%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --ring: 38 76% 41%;
+    --radius: 0.75rem;
+
+    --rr-canvas: #f8f8f6;
+    --rr-surface: #ffffff;
+    --rr-ink: #18181b;
+    --rr-muted: #71717a;
+    --rr-border: #e4e4e7;
+    --rr-accent: #b98219;
+    --rr-accent-strong: #946713;
+    --rr-focus: rgba(185, 130, 25, 0.28);
+    --rr-shadow: 0 18px 50px rgba(24, 24, 27, 0.08);
   }
 
   .dark {
+    color-scheme: dark;
     /* Grayscale dark mode - all saturation set to 0 */
     --background: 0 0% 7%;
     --foreground: 0 0% 95%;
@@ -81,17 +106,203 @@
     --destructive-foreground: 0 0% 95%;
     --border: 0 0% 18%;
     --input: 0 0% 18%;
-    --ring: 0 0% 70%;
+    --ring: 38 76% 56%;
+
+    --rr-canvas: #111113;
+    --rr-surface: #18181b;
+    --rr-ink: #fafafa;
+    --rr-muted: #a1a1aa;
+    --rr-border: #27272a;
+    --rr-accent: #dba642;
+    --rr-accent-strong: #e9c575;
+    --rr-focus: rgba(219, 166, 66, 0.26);
+    --rr-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
+
+  html {
+    background: var(--rr-canvas);
+    text-rendering: optimizeLegibility;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    margin: 0;
+    min-width: 320px;
+    min-height: 100dvh;
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: var(--font-sans);
+    background: var(--rr-canvas);
+    color: var(--rr-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    outline-color: var(--rr-accent);
+  }
+
+  button {
+    min-height: 44px;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:active,
+  a:active {
+    transform: translateY(1px);
+  }
+}
+
+@layer components {
+  .rr-panel {
+    border: 1px solid var(--rr-border);
+    background: var(--rr-surface);
+    box-shadow: var(--rr-shadow);
+  }
+
+  .rr-button-primary {
+    min-height: 44px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    background-color: #18181b !important;
+    color: #ffffff !important;
+    transition: background-color 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  }
+
+  .rr-button-primary:hover {
+    background-color: #27272a !important;
+  }
+
+  .dark .rr-button-primary {
+    background-color: #e9c575 !important;
+    color: #18181b !important;
+  }
+
+  .dark .rr-button-primary:hover {
+    background-color: #f4dfb9 !important;
+  }
+
+  .rr-button-primary :where(svg, span, strong) {
+    color: inherit !important;
+    stroke: currentColor;
+  }
+
+  .rr-button-primary:disabled,
+  .rr-button-primary[aria-disabled="true"] {
+    cursor: not-allowed;
+    border-color: #d4d4d8;
+    background-color: #e4e4e7 !important;
+    color: #71717a !important;
+    transform: none;
+  }
+
+  .rr-button-primary:disabled:hover,
+  .rr-button-primary[aria-disabled="true"]:hover {
+    background-color: #e4e4e7 !important;
+    color: #71717a !important;
+  }
+
+  .dark .rr-button-primary:disabled,
+  .dark .rr-button-primary[aria-disabled="true"] {
+    border-color: #3f3f46;
+    background-color: #27272a !important;
+    color: #a1a1aa !important;
+  }
+
+  .dark .rr-button-primary:disabled:hover,
+  .dark .rr-button-primary[aria-disabled="true"]:hover {
+    background-color: #27272a !important;
+    color: #a1a1aa !important;
+  }
+
+  .rr-button-secondary {
+    min-height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--rr-border);
+    background: color-mix(in srgb, var(--rr-surface) 94%, var(--rr-accent));
+    color: var(--rr-ink);
+    transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+  }
+
+  .rr-button-secondary:hover {
+    border-color: color-mix(in srgb, var(--rr-border) 55%, var(--rr-accent));
+    background: color-mix(in srgb, var(--rr-surface) 88%, var(--rr-accent));
+  }
+
+  .rr-button-secondary:disabled,
+  .rr-button-secondary[aria-disabled="true"] {
+    cursor: not-allowed;
+    border-color: #d4d4d8;
+    background: #f4f4f5;
+    color: #a1a1aa;
+    transform: none;
+  }
+
+  .dark .rr-button-secondary:disabled,
+  .dark .rr-button-secondary[aria-disabled="true"] {
+    border-color: #3f3f46;
+    background: #202024;
+    color: #71717a;
+  }
+
+  .rr-icon-button {
+    min-height: 44px;
+    min-width: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--rr-border);
+    background: var(--rr-surface);
+    color: var(--rr-muted);
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+  }
+
+  .rr-icon-button:hover {
+    border-color: color-mix(in srgb, var(--rr-border) 55%, var(--rr-accent));
+    color: var(--rr-ink);
+    background: color-mix(in srgb, var(--rr-surface) 92%, var(--rr-accent));
+  }
+
+  .rr-input {
+    min-height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--rr-border);
+    background: var(--rr-surface);
+    color: var(--rr-ink);
+    transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  }
+
+  .rr-input:focus {
+    border-color: var(--rr-accent);
+    box-shadow: 0 0 0 4px var(--rr-focus);
+  }
+
+  .rr-focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--rr-focus);
+  }
+
+  .rr-logo-tile {
+    border: 1px solid var(--rr-border);
+    background: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
   }
 }
 
@@ -135,4 +346,3 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--foreground));
 }
-
